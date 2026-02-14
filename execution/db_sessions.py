@@ -10,6 +10,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
+# Quando tenant_id é None ou "default", usa tabelas legado (sessions, conversation_log).
+# Quando tenant_id é um UUID válido, usa tabelas multi-tenant (conversations, tenant_conversation_log, leads).
+def _use_tenant_tables(tenant_id: Optional[str]) -> bool:
+    if not tenant_id or str(tenant_id).strip().lower() == "default":
+        return False
+    return True
+
 # Estados válidos da máquina SPIN (ordem importa para transição)
 STATES = (
     "descoberta",
@@ -84,7 +91,7 @@ def get_connection() -> sqlite3.Connection:
 
 
 def init_db() -> None:
-    """Cria as tabelas se não existirem. Postgres: cria automaticamente. Supabase REST: rode supabase_schema.sql no SQL Editor."""
+    """Cria as tabelas se não existirem (legado + multi-tenant). Postgres: cria automaticamente. Supabase REST: rode supabase_schema.sql no SQL Editor."""
     if _use_postgres():
         conn = _get_pg_connection()
         try:
@@ -109,6 +116,75 @@ def init_db() -> None:
             """
             with conn.cursor() as cur:
                 cur.execute(schema_sql)
+            multi_tenant_sql = """
+                CREATE TABLE IF NOT EXISTS tenants (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    company_name TEXT NOT NULL,
+                    plan TEXT NOT NULL DEFAULT 'free' CHECK (plan IN ('free', 'pro', 'enterprise')),
+                    settings JSONB DEFAULT '{}',
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+                CREATE TABLE IF NOT EXISTS agents (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+                    name TEXT NOT NULL,
+                    niche TEXT,
+                    prompt_custom TEXT,
+                    active BOOLEAN NOT NULL DEFAULT true,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+                CREATE INDEX IF NOT EXISTS idx_agents_tenant ON agents (tenant_id);
+                CREATE TABLE IF NOT EXISTS conversations (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+                    agent_id UUID NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+                    lead_id TEXT NOT NULL,
+                    state TEXT NOT NULL DEFAULT 'descoberta',
+                    spin_answers JSONB DEFAULT '{}',
+                    lead_classification TEXT NOT NULL DEFAULT 'frio',
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    UNIQUE (tenant_id, agent_id, lead_id)
+                );
+                CREATE INDEX IF NOT EXISTS idx_conversations_tenant_lead ON conversations (tenant_id, lead_id);
+                CREATE TABLE IF NOT EXISTS tenant_conversation_log (
+                    id BIGSERIAL PRIMARY KEY,
+                    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+                    agent_id UUID REFERENCES agents(id) ON DELETE SET NULL,
+                    lead_id TEXT NOT NULL,
+                    role TEXT NOT NULL,
+                    content_type TEXT NOT NULL DEFAULT 'text',
+                    content TEXT NOT NULL,
+                    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+                CREATE INDEX IF NOT EXISTS idx_tenant_conversation_log_lead_ts ON tenant_conversation_log (tenant_id, lead_id, timestamp DESC);
+                CREATE TABLE IF NOT EXISTS leads (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+                    lead_id TEXT NOT NULL,
+                    classification TEXT NOT NULL DEFAULT 'frio' CHECK (classification IN ('frio', 'morno', 'quente', 'cliente')),
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    UNIQUE (tenant_id, lead_id)
+                );
+                CREATE TABLE IF NOT EXISTS documents (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+                    file_path TEXT NOT NULL,
+                    embedding_namespace TEXT NOT NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+            """
+            with conn.cursor() as cur:
+                for stmt in multi_tenant_sql.split(";"):
+                    stmt = stmt.strip()
+                    if stmt and not stmt.startswith("--"):
+                        try:
+                            cur.execute(stmt)
+                        except Exception:
+                            pass
             conn.commit()
         finally:
             conn.close()
@@ -142,11 +218,54 @@ def init_db() -> None:
         conn.close()
 
 
-def get_or_create_session(user_id: str) -> dict:
+def get_or_create_session(
+    user_id: str,
+    tenant_id: Optional[str] = None,
+    agent_id: Optional[str] = None,
+) -> dict:
     """
-    Retorna a sessão do usuário. Se não existir, cria com estado 'descoberta' e classificação 'frio'.
+    Retorna a sessão do usuário (ou conversa tenant+agent+lead). Se não existir, cria com estado 'descoberta' e classificação 'frio'.
+    Quando tenant_id e agent_id são informados (e tenant_id != 'default'), usa tabelas conversations/tenant_conversation_log.
     """
     user_id = str(user_id)
+    if _use_tenant_tables(tenant_id) and agent_id and _use_postgres():
+        conn = _get_pg_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """SELECT lead_id, state, lead_classification, spin_answers, created_at, updated_at
+                       FROM conversations WHERE tenant_id = %s AND agent_id = %s AND lead_id = %s""",
+                    (tenant_id, agent_id, user_id),
+                )
+                row = cur.fetchone()
+            if row:
+                spin = row["spin_answers"] if isinstance(row["spin_answers"], dict) else (json.loads(row["spin_answers"]) if row["spin_answers"] else {})
+                return {
+                    "user_id": row["lead_id"],
+                    "current_state": row["state"],
+                    "lead_classification": row["lead_classification"],
+                    "spin_answers": spin,
+                    "created_at": str(row["created_at"]) if row["created_at"] else "",
+                    "updated_at": str(row["updated_at"]) if row["updated_at"] else "",
+                }
+            now = datetime.utcnow().isoformat() + "Z"
+            with conn.cursor() as cur:
+                cur.execute(
+                    """INSERT INTO conversations (tenant_id, agent_id, lead_id, state, lead_classification, spin_answers, created_at, updated_at)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
+                    (tenant_id, agent_id, user_id, "descoberta", "frio", json.dumps({}), now, now),
+                )
+            conn.commit()
+            return {
+                "user_id": user_id,
+                "current_state": "descoberta",
+                "lead_classification": "frio",
+                "spin_answers": {},
+                "created_at": now,
+                "updated_at": now,
+            }
+        finally:
+            conn.close()
     if _use_postgres():
         conn = _get_pg_connection()
         try:
@@ -247,12 +366,29 @@ def get_or_create_session(user_id: str) -> dict:
         conn.close()
 
 
-def update_state(user_id: str, new_state: str) -> None:
-    """Atualiza o estado da sessão."""
+def update_state(
+    user_id: str,
+    new_state: str,
+    tenant_id: Optional[str] = None,
+    agent_id: Optional[str] = None,
+) -> None:
+    """Atualiza o estado da sessão (ou da conversa multi-tenant)."""
     if new_state not in STATES:
         raise ValueError(f"Estado inválido: {new_state}")
     user_id = str(user_id)
     now = datetime.utcnow().isoformat() + "Z"
+    if _use_tenant_tables(tenant_id) and agent_id and _use_postgres():
+        conn = _get_pg_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE conversations SET state = %s, updated_at = %s WHERE tenant_id = %s AND agent_id = %s AND lead_id = %s",
+                    (new_state, now, tenant_id, agent_id, user_id),
+                )
+            conn.commit()
+        finally:
+            conn.close()
+        return
     if _use_postgres():
         conn = _get_pg_connection()
         try:
@@ -282,14 +418,34 @@ def update_state(user_id: str, new_state: str) -> None:
         conn.close()
 
 
-def reset_session(user_id: str) -> None:
+def reset_session(
+    user_id: str,
+    tenant_id: Optional[str] = None,
+    agent_id: Optional[str] = None,
+) -> None:
     """
-    Reseta a conversa do usuário: estado para 'descoberta', classificação 'frio',
-    spin_answers vazio e apaga todo o histórico (conversation_log).
+    Reseta a conversa: estado 'descoberta', classificação 'frio', spin_answers vazio e apaga histórico.
+    Com tenant_id/agent_id usa tabelas multi-tenant.
     """
     user_id = str(user_id)
     now = datetime.utcnow().isoformat() + "Z"
     empty_spin = json.dumps({}, ensure_ascii=False)
+    if _use_tenant_tables(tenant_id) and agent_id and _use_postgres():
+        conn = _get_pg_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE conversations SET state = %s, lead_classification = %s, spin_answers = %s, updated_at = %s WHERE tenant_id = %s AND agent_id = %s AND lead_id = %s",
+                    ("descoberta", "frio", empty_spin, now, tenant_id, agent_id, user_id),
+                )
+                cur.execute(
+                    "DELETE FROM tenant_conversation_log WHERE tenant_id = %s AND lead_id = %s",
+                    (tenant_id, user_id),
+                )
+            conn.commit()
+        finally:
+            conn.close()
+        return
     if _use_postgres():
         conn = _get_pg_connection()
         try:
@@ -325,12 +481,29 @@ def reset_session(user_id: str) -> None:
         conn.close()
 
 
-def update_classification(user_id: str, classification: str) -> None:
-    """Atualiza a classificação do lead."""
+def update_classification(
+    user_id: str,
+    classification: str,
+    tenant_id: Optional[str] = None,
+    agent_id: Optional[str] = None,
+) -> None:
+    """Atualiza a classificação do lead (sessão legado ou conversa multi-tenant)."""
     if classification not in CLASSIFICATIONS:
         raise ValueError(f"Classificação inválida: {classification}")
     user_id = str(user_id)
     now = datetime.utcnow().isoformat() + "Z"
+    if _use_tenant_tables(tenant_id) and agent_id and _use_postgres():
+        conn = _get_pg_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE conversations SET lead_classification = %s, updated_at = %s WHERE tenant_id = %s AND agent_id = %s AND lead_id = %s",
+                    (classification, now, tenant_id, agent_id, user_id),
+                )
+            conn.commit()
+        finally:
+            conn.close()
+        return
     if _use_postgres():
         conn = _get_pg_connection()
         try:
@@ -360,9 +533,34 @@ def update_classification(user_id: str, classification: str) -> None:
         conn.close()
 
 
-def update_spin_answers(user_id: str, spin_answers: dict[str, Any]) -> None:
-    """Substitui ou mescla as respostas SPIN da sessão."""
+def update_spin_answers(
+    user_id: str,
+    spin_answers: dict[str, Any],
+    tenant_id: Optional[str] = None,
+    agent_id: Optional[str] = None,
+) -> None:
+    """Substitui ou mescla as respostas SPIN da sessão (ou conversa multi-tenant)."""
     user_id = str(user_id)
+    if _use_tenant_tables(tenant_id) and agent_id and _use_postgres():
+        conn = _get_pg_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT spin_answers FROM conversations WHERE tenant_id = %s AND agent_id = %s AND lead_id = %s", (tenant_id, agent_id, user_id))
+                row = cur.fetchone()
+            current = {}
+            if row and row.get("spin_answers"):
+                current = row["spin_answers"] if isinstance(row["spin_answers"], dict) else json.loads(row["spin_answers"])
+            merged = {**current, **spin_answers}
+            now = datetime.utcnow().isoformat() + "Z"
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE conversations SET spin_answers = %s, updated_at = %s WHERE tenant_id = %s AND agent_id = %s AND lead_id = %s",
+                    (json.dumps(merged, ensure_ascii=False), now, tenant_id, agent_id, user_id),
+                )
+            conn.commit()
+        finally:
+            conn.close()
+        return
     if _use_postgres():
         conn = _get_pg_connection()
         try:
@@ -418,12 +616,27 @@ def append_log(
     role: str,
     content: str,
     content_type: str = "text",
+    tenant_id: Optional[str] = None,
+    agent_id: Optional[str] = None,
 ) -> None:
-    """Append uma mensagem ao log da conversa (role: user ou assistant)."""
+    """Append uma mensagem ao log da conversa (role: user ou assistant). Com tenant_id usa tenant_conversation_log."""
     if role not in ("user", "assistant"):
         raise ValueError("role deve ser 'user' ou 'assistant'")
     user_id = str(user_id)
     now = datetime.utcnow().isoformat() + "Z"
+    if _use_tenant_tables(tenant_id) and agent_id and _use_postgres():
+        conn = _get_pg_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """INSERT INTO tenant_conversation_log (tenant_id, agent_id, lead_id, role, content_type, content, timestamp)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+                    (tenant_id, agent_id, user_id, role, content_type, content, now),
+                )
+            conn.commit()
+        finally:
+            conn.close()
+        return
     if _use_postgres():
         conn = _get_pg_connection()
         try:
@@ -456,9 +669,35 @@ def append_log(
         conn.close()
 
 
-def get_recent_log(user_id: str, limit: int = 20) -> list[dict]:
-    """Retorna as últimas N mensagens do usuário (para contexto do LLM)."""
+def get_recent_log(
+    user_id: str,
+    limit: int = 20,
+    tenant_id: Optional[str] = None,
+    agent_id: Optional[str] = None,
+) -> list[dict]:
+    """Retorna as últimas N mensagens do usuário (para contexto do LLM). Com tenant_id usa tenant_conversation_log."""
     user_id = str(user_id)
+    if _use_tenant_tables(tenant_id) and agent_id and _use_postgres():
+        conn = _get_pg_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """SELECT role, content_type, content, timestamp FROM tenant_conversation_log
+                       WHERE tenant_id = %s AND lead_id = %s ORDER BY timestamp DESC LIMIT %s""",
+                    (tenant_id, user_id, limit),
+                )
+                rows = cur.fetchall()
+            out = []
+            for row in reversed(rows):
+                out.append({
+                    "role": row["role"],
+                    "content_type": row.get("content_type", "text"),
+                    "content": row["content"],
+                    "timestamp": str(row["timestamp"]) if row.get("timestamp") else "",
+                })
+            return out
+        finally:
+            conn.close()
     if _use_postgres():
         conn = _get_pg_connection()
         try:
@@ -524,22 +763,25 @@ def get_recent_log(user_id: str, limit: int = 20) -> list[dict]:
         conn.close()
 
 
-def classify_lead_heuristic(user_id: str, state: str, signals: dict) -> str:
-    """
-    Heurística de classificação. Atualiza e retorna a classificação.
-    """
-    session = get_or_create_session(user_id)
+def classify_lead_heuristic(
+    user_id: str,
+    state: str,
+    signals: dict,
+    tenant_id: Optional[str] = None,
+    agent_id: Optional[str] = None,
+) -> str:
+    """Heurística de classificação. Atualiza e retorna a classificação."""
+    session = get_or_create_session(user_id, tenant_id=tenant_id, agent_id=agent_id)
     current = session["lead_classification"]
-
     if signals.get("paid"):
-        update_classification(user_id, "cliente")
+        update_classification(user_id, "cliente", tenant_id=tenant_id, agent_id=agent_id)
         return "cliente"
     if signals.get("asked_payment_link") or state == "fechamento":
-        update_classification(user_id, "quente")
+        update_classification(user_id, "quente", tenant_id=tenant_id, agent_id=agent_id)
         return "quente"
     if state in ("solucao", "oferta") or signals.get("engagement") == "high":
         if current == "frio":
-            update_classification(user_id, "morno")
+            update_classification(user_id, "morno", tenant_id=tenant_id, agent_id=agent_id)
             return "morno"
         return current
     return current

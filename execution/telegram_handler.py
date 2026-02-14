@@ -291,6 +291,18 @@ async def _handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await update.message.reply_text("Não consegui entender. Pode mandar de novo em texto ou áudio?")
         return
 
+    # 1) Multi-tenant: só usa o adapter se TELEGRAM_USE_MULTITENANT=1 (senão o bot segue 100% legado).
+    use_multitenant = os.environ.get("TELEGRAM_USE_MULTITENANT", "").strip() in ("1", "true", "yes")
+    if use_multitenant:
+        try:
+            from adapters import telegram_adapter
+            tenant_id = telegram_adapter._resolve_tenant_id(update)
+            if tenant_id and str(tenant_id).strip().lower() != "default":
+                await telegram_adapter.handle_update(update, context)
+                return
+        except Exception:
+            pass
+
     # 2) Adapter: buffer com debounce (apenas para texto). Se buffer ativo, consolida antes de chamar o CORE.
     if message_buffer_available() and not is_audio:
         tenant_id = os.environ.get("MESSAGE_BUFFER_TENANT_ID", "default")
@@ -312,14 +324,27 @@ async def _handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    init_db()
+    if update.effective_user:
+        get_or_create_session(str(update.effective_user.id))
+    if os.environ.get("TELEGRAM_USE_MULTITENANT", "").strip() in ("1", "true", "yes"):
+        if update.message and update.message.text and " t_" in update.message.text.strip().lower():
+            try:
+                from adapters import telegram_adapter
+                tenant_id = telegram_adapter._resolve_tenant_id(update)
+                if tenant_id and str(tenant_id).strip().lower() != "default":
+                    telegram_adapter.set_telegram_tenant_for_user(str(update.effective_user.id), tenant_id)
+                    await update.message.reply_text(
+                        "Bem-vindo! Em que posso ajudar? (pode ser por áudio ou texto.)"
+                    )
+                    return
+            except Exception:
+                pass
     if update.message:
         await update.message.reply_text(
             "Oi! Sou seu consultor de filtros de água. "
             "Pode me contar como é a água aí na sua casa e como vocês usam? (pode ser por áudio ou texto.)"
         )
-    init_db()
-    if update.effective_user:
-        get_or_create_session(str(update.effective_user.id))
 
 
 async def cmd_reset(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -369,6 +394,32 @@ def build_app(token: str) -> Application:
     return app
 
 
+def _log_buffer_status() -> None:
+    """Loga na inicialização se o buffer (Redis) está ativo, para aparecer nos logs do deploy."""
+    redis_url = os.environ.get("REDIS_URL", "").strip()
+    debounce = os.environ.get("MESSAGE_BUFFER_DEBOUNCE_SECONDS", "5").strip()
+    if not redis_url:
+        logger.warning(
+            "Buffer INATIVO: REDIS_URL não definido. Defina REDIS_URL no Railway (Settings → Variables) "
+            "para agrupar mensagens antes de responder. Agora: uma resposta por mensagem."
+        )
+        return
+    try:
+        import redis
+        r = redis.from_url(redis_url, decode_responses=True)
+        r.ping()
+        logger.info(
+            "Buffer ATIVO (Redis OK). Debounce: %ss — mensagens de texto serão agrupadas antes de responder.",
+            debounce,
+        )
+    except Exception as e:
+        logger.warning(
+            "Buffer INATIVO: Redis indisponível (%s). Mensagens uma a uma. "
+            "Redis Labs: use redis:// (não rediss://) ou abra a porta no firewall.",
+            e,
+        )
+
+
 def run_bot() -> None:
     """Ponto de entrada: carrega .env, inicia DB e roda o bot (long polling)."""
     from dotenv import load_dotenv
@@ -376,6 +427,7 @@ def run_bot() -> None:
     token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
     if not token:
         raise ValueError("TELEGRAM_BOT_TOKEN não configurado.")
+    _log_buffer_status()
     init_db()
     app = build_app(token)
     print("Bot iniciado. Use apenas ESTE processo (feche outras instâncias). Ctrl+C para parar.")

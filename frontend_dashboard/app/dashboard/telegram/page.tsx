@@ -1,0 +1,323 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { api, getApiBase } from "@/lib/api";
+
+type Tenant = { id: string; company_name: string };
+type BotInfo = { bot_username: string | null; connected: boolean };
+
+function getErrorMessage(err: unknown): string {
+  if (err && typeof err === "object" && "message" in err) {
+    return String((err as { message: string }).message);
+  }
+  return "Não foi possível conectar. Verifique o token.";
+}
+
+export default function TelegramPage() {
+  const [tenant, setTenant] = useState<Tenant | null>(null);
+  const [botInfo, setBotInfo] = useState<BotInfo | null>(null);
+  const [token, setToken] = useState("");
+  const [showToken, setShowToken] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [serverTokenCheck, setServerTokenCheck] = useState<{ valid: boolean; username?: string; error?: string } | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const load = () => {
+    api<Tenant>("/tenants/me").then(setTenant).catch(() => setTenant(null));
+    api<BotInfo>("/telegram/status")
+      .then((data) => setBotInfo(data))
+      .catch(() => setBotInfo(null));
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const connectWithPayload = async (payload: { bot_token?: string; bot_token_b64?: string; use_server_token?: boolean }) => {
+    setError(null);
+    setSuccess(null);
+    setLoading(true);
+    try {
+      await api("/telegram/connect", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      setSuccess("Telegram conectado. Seu bot já pode receber mensagens.");
+      setToken("");
+      if (inputRef.current) inputRef.current.value = "";
+      load();
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleConnectWithServerToken = async () => {
+    await connectWithPayload({ use_server_token: true });
+  };
+
+  const handleCheckServerToken = async () => {
+    setServerTokenCheck(null);
+    setError(null);
+    try {
+      const res = await api<{ valid: boolean; username?: string; error?: string }>("/telegram/check-server-token");
+      setServerTokenCheck(res);
+    } catch {
+      setServerTokenCheck({ valid: false, error: "Não foi possível contactar o servidor." });
+    }
+  };
+
+  const handleConnect = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const raw = inputRef.current?.value ?? token;
+    const t = String(raw ?? "").trim().replace(/\s/g, "");
+    if (!t) {
+      setError("Cole o token do bot do BotFather.");
+      return;
+    }
+    if (t.length < 40 || t.length > 70) {
+      setError("O token costuma ter 45–60 caracteres. Verifique se colou completo (sem espaços ou quebras).");
+      return;
+    }
+    // Enviar em base64 evita corrupção por encoding no JSON (caracteres especiais, etc.)
+    try {
+      const b64 = typeof btoa !== "undefined" ? btoa(t) : Buffer.from(t, "utf-8").toString("base64");
+      await connectWithPayload({ bot_token_b64: b64 });
+    } catch {
+      await connectWithPayload({ bot_token: t });
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setError(null);
+    setSuccess(null);
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const t = String(reader.result ?? "").trim().replace(/\s/g, "");
+      if (!t || t.length < 40) {
+        setError("O arquivo deve conter apenas o token (uma linha, 45–60 caracteres).");
+        return;
+      }
+      setLoading(true);
+      try {
+        const b64 = typeof btoa !== "undefined" ? btoa(t) : Buffer.from(t, "utf-8").toString("base64");
+        await connectWithPayload({ bot_token_b64: b64 });
+      } catch (err: unknown) {
+        setError(getErrorMessage(err));
+      } finally {
+        setLoading(false);
+      }
+    };
+    reader.readAsText(file, "UTF-8");
+    e.target.value = "";
+  };
+
+  const handleDisconnect = async () => {
+    setError(null);
+    setSuccess(null);
+    setLoading(true);
+    try {
+      await api("/telegram/disconnect", { method: "DELETE" });
+      setSuccess("Telegram desconectado.");
+      load();
+    } catch {
+      setError("Não foi possível desconectar.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const tenantId = tenant?.id ?? "";
+  const botUsername = botInfo?.bot_username ?? "";
+  const connected = botInfo?.connected ?? false;
+  const deepLink =
+    tenantId && botUsername
+      ? `https://t.me/${botUsername}?start=t_${tenantId}`
+      : "";
+
+  return (
+    <div>
+      <h1 className="text-2xl font-bold text-slate-800 mb-6">Conexão Telegram</h1>
+
+      <div className="max-w-xl space-y-6">
+        {/* Modo que funciona: run_bot.py */}
+        <div className="rounded-lg border-2 border-emerald-200 bg-emerald-50 p-6">
+          <h2 className="font-semibold text-emerald-900 mb-2">Fazer o bot responder no Telegram</h2>
+          <p className="text-emerald-800 text-sm mb-3">
+            O chat do bot <strong>não depende deste dashboard</strong>. Na pasta raiz do projeto (onde está o <code className="bg-white/70 px-1 rounded">.env</code>), abra um terminal e rode:
+          </p>
+          <pre className="bg-white border border-emerald-200 rounded px-3 py-2 text-sm font-mono text-slate-800 overflow-x-auto">
+            python run_bot.py
+          </pre>
+          <p className="text-emerald-800 text-sm mt-2">
+            Deixe o terminal aberto. O bot usa o <code className="bg-white/70 px-1 rounded">TELEGRAM_BOT_TOKEN</code> do <code className="bg-white/70 px-1 rounded">.env</code> e responde por long polling. Abra o bot no Telegram e converse.
+          </p>
+        </div>
+
+        {/* Conectar por webhook (opcional) */}
+        <div className="rounded-lg border border-slate-200 bg-white p-6">
+          <h2 className="font-semibold text-slate-800 mb-2">Webhook (opcional)</h2>
+          <p className="text-slate-600 text-sm mb-3">
+            Só use esta seção se quiser que o bot receba mensagens via URL pública (ngrok, servidor). Caso contrário, use <code className="bg-slate-100 px-1 rounded">python run_bot.py</code> acima.
+          </p>
+          {connected ? (
+            <div className="space-y-3">
+              <p className="text-slate-600 text-sm">
+                Conectado como <strong>@{botUsername}</strong>. O bot está ativo e recebendo mensagens.
+              </p>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleDisconnect}
+                  disabled={loading}
+                  className="px-4 py-2 rounded-lg border border-red-200 text-red-700 hover:bg-red-50 disabled:opacity-50"
+                >
+                  Desconectar
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <p className="text-slate-600 text-sm mb-2">
+                  Se o token está no <code className="bg-slate-100 px-1 rounded">.env</code> do servidor (<code className="bg-slate-100 px-1 rounded">TELEGRAM_BOT_TOKEN</code>):
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleCheckServerToken}
+                    disabled={loading}
+                    className="px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-700 text-sm hover:bg-slate-50"
+                  >
+                    Testar token do servidor
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleConnectWithServerToken}
+                    disabled={loading}
+                    className="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 font-medium"
+                  >
+                    {loading ? "Conectando…" : "Conectar com token do servidor"}
+                  </button>
+                </div>
+                {serverTokenCheck && (
+                  <div className={`text-sm mt-2 ${serverTokenCheck.valid ? "text-green-700" : "text-red-600"}`}>
+                    <p>
+                      {serverTokenCheck.valid
+                        ? `Token do servidor: válido (@${serverTokenCheck.username}). Pode clicar em Conectar.`
+                        : `Token do servidor: ${serverTokenCheck.error}`}
+                    </p>
+                    {!serverTokenCheck.valid && serverTokenCheck.error?.includes("contactar o servidor") && (
+                      <p className="text-slate-600 text-xs mt-2">
+                        O dashboard não está alcançando o backend. URL chamada: <code className="bg-slate-100 px-1 rounded break-all">{getApiBase()}/telegram/check-server-token</code>. Confira: (1) Backend rodando? Na pasta do projeto: <code className="bg-slate-100 px-1 rounded">python run_platform_backend.py</code>. (2) Abra <a href="http://127.0.0.1:8000/health" target="_blank" rel="noopener noreferrer" className="underline">http://127.0.0.1:8000/health</a> no navegador — deve mostrar {`{"status":"ok"}`}.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+              <div className="border-t border-slate-200 pt-3">
+                <p className="text-slate-600 text-sm mb-2">Ou envie um arquivo .txt com apenas o token (evita colar):</p>
+                <label className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-300 bg-white text-sm cursor-pointer hover:bg-slate-50">
+                  <input type="file" accept=".txt,text/plain" onChange={handleFileSelect} disabled={loading} className="sr-only" />
+                  <span>Selecionar arquivo .txt</span>
+                </label>
+              </div>
+              <p className="text-slate-500 text-sm border-t border-slate-200 pt-3">Ou cole o token abaixo:</p>
+            <form onSubmit={handleConnect} className="space-y-3">
+              <div className="relative">
+                <input
+                  ref={inputRef}
+                  type={showToken ? "text" : "password"}
+                  value={token}
+                  onChange={(e) => setToken(e.target.value)}
+                  placeholder="Ex: 7810006820:AAH..."
+                  className="w-full rounded-lg border border-slate-300 pl-3 pr-10 py-2 text-sm font-mono"
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowToken((s) => !s)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-500 hover:text-slate-700 rounded"
+                  title={showToken ? "Ocultar token" : "Mostrar token"}
+                  aria-label={showToken ? "Ocultar token" : "Mostrar token"}
+                >
+                  {showToken ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                      <line x1="1" y1="1" x2="23" y2="23" />
+                    </svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+              <p className="text-xs text-slate-500">45–60 caracteres</p>
+              <button
+                type="submit"
+                disabled={loading}
+                className="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {loading ? "Conectando…" : "Conectar"}
+              </button>
+            </form>
+            </div>
+          )}
+          {error && (
+            <div className="mt-2">
+              <p className="text-sm text-red-600">{error}</p>
+              {error.toLowerCase().includes("token inválido") && (
+                <p className="text-xs text-slate-600 mt-1">
+                  Dica: confira no BotFather se não trocou o número <strong>1</strong> pela letra <strong>l</strong> (ou o contrário). Use o ícone do olho para conferir o token.
+                </p>
+              )}
+              {error.includes("administrador") && (
+                <p className="text-xs text-slate-500 mt-1">
+                  Para administradores: defina <code className="bg-slate-100 px-1 rounded">TELEGRAM_WEBHOOK_BASE_URL</code> (ou <code className="bg-slate-100 px-1 rounded">WHATSAPP_WEBHOOK_BASE_URL</code>) no servidor com a URL pública do backend (ex.: https://seu-dominio.com). Em teste local use ngrok.
+                </p>
+              )}
+            </div>
+          )}
+          {success && <p className="text-sm text-green-600 mt-2">{success}</p>}
+        </div>
+
+        {/* Link do tenant */}
+        {tenantId && (
+          <div className="rounded-lg border border-slate-200 bg-white p-6">
+            <h2 className="font-semibold text-slate-800 mb-2">Link do seu bot (compartilhe com clientes)</h2>
+            {deepLink ? (
+              <>
+                <p className="text-sm text-slate-600 break-all font-mono bg-slate-50 border border-slate-200 rounded px-3 py-2">
+                  {deepLink}
+                </p>
+                <p className="text-xs text-slate-500 mt-2">
+                  Quem abrir esse link no Telegram já será associado à sua empresa.
+                </p>
+              </>
+            ) : (
+              <p className="text-sm text-slate-600">
+                Conecte o bot acima para gerar o link exclusivo do seu tenant.
+              </p>
+            )}
+          </div>
+        )}
+
+        <div className="rounded-lg border border-slate-200 bg-white p-6">
+          <h2 className="font-semibold text-slate-800 mb-2">Resumo</h2>
+          <ul className="text-sm text-slate-600 space-y-2 list-disc list-inside">
+            <li><strong>Modo simples:</strong> <code className="bg-slate-100 px-1 rounded">python run_bot.py</code> na pasta do projeto — o bot responde usando o token do .env.</li>
+            <li><strong>Webhook:</strong> opcional; exige TELEGRAM_WEBHOOK_BASE_URL e &quot;Conectar com token do servidor&quot;.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+}

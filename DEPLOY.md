@@ -39,7 +39,8 @@ Para usar o Drive em produção, você precisa gerar o `token.json` **uma vez** 
    | `DATABASE_URL` | Connection string Postgres (ex.: Supabase) |
    | `DRIVE_FOLDER_ID` | ID da pasta do Drive (RAG) |
    | **`GOOGLE_TOKEN_JSON`** | Conteúdo completo do arquivo `token.json` (um único texto em JSON) |
-   | `REDIS_URL` | Opcional; Redis para buffer (pode usar Redis do Railway) |
+   | **`REDIS_URL`** | **Recomendado** — sem isso o bot responde uma mensagem por vez. Use Redis do Railway (Add Redis) ou Redis Labs. |
+   | `MESSAGE_BUFFER_DEBOUNCE_SECONDS` | Opcional; ex.: `5` (segundos para juntar mensagens). |
 
 3. **Start Command:** `python run_production.py`
 4. Faça o deploy. O bot sobe e o RAG usa o Drive via `GOOGLE_TOKEN_JSON`.
@@ -97,3 +98,18 @@ Não é necessário `GOOGLE_CREDENTIALS_JSON` em produção se você já tiver o
 - **Máximo controle e arquivos no disco:** use uma **VPS** e deixe `credentials.json` e `token.json` na pasta do projeto como no desenvolvimento.
 
 Qualquer uma dessas opções deixa o bot rodando independente do seu computador, com RAG funcionando.
+
+---
+
+## 5. Deploy na Vercel (produção)
+
+Para subir o **dashboard** e a **API** na Vercel em modo produção, use **dois projetos** (mesmo repositório): um para o backend (FastAPI) e outro para o frontend (Next.js). Passo a passo e variáveis: **[docs/DEPLOY_VERCEL.md](docs/DEPLOY_VERCEL.md)**.
+
+---
+
+## 6. Platform (dashboard) — Telegram por token
+
+Se você usa o **dashboard** e a opção **Conexão Telegram** (usuário cola o token do bot e o bot começa a rodar):
+
+1. **Banco:** execute o schema em `database/schema.sql` no seu Postgres (inclui a tabela `tenant_telegram_config`).
+2. **URL do webhook:** defina **`TELEGRAM_WEBHOOK_BASE_URL`** com a URL pública do backend (ex.: `https://seu-dominio.com`). O Telegram envia as mensagens para `{TELEGRAM_WEBHOOK_BASE_URL}/api/webhook/telegram/{tenant_id}`. Se não definir, o sistema usa `WHATSAPP_WEBHOOK_BASE_URL`.
