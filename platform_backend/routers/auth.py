@@ -29,6 +29,19 @@ class TokenResponse(BaseModel):
 
 @router.post("/login", response_model=TokenResponse)
 def login(req: LoginRequest):
+    # #region agent log
+    try:
+        from pathlib import Path
+        root = Path(__file__).resolve().parent.parent.parent
+        log_path = root / ".cursor" / "debug.log"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        import json
+        payload = {"message": "auth_login_entry", "data": {"path": "/api/auth/login"}, "hypothesisId": "H2", "timestamp": __import__("time").time() * 1000}
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(payload, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+    # #endregion
     with get_cursor() as cur:
         cur.execute(
             "SELECT id, tenant_id, password_hash FROM platform_users WHERE email = %s",
