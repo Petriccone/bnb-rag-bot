@@ -1,0 +1,25 @@
+# SDR Telegram Bot - filtros de água (SPIN Selling)
+# Python 3.10+
+
+# Telegram
+python-telegram-bot>=21.0
+
+# OpenAI (LLM, Whisper STT, TTS)
+openai>=1.40.0
+
+# Google Drive API
+google-auth>=2.27.0
+google-auth-oauthlib>=1.2.0
+google-auth-httplib2>=0.2.0
+google-api-python-client>=2.115.0
+
+# Ambiente e async
+python-dotenv>=1.0.0
+
+# Banco de dados
+# SQLite: stdlib. Supabase REST: supabase. Postgres (connection string): psycopg2
+supabase>=2.0.0
+psycopg2-binary>=2.9.0
+
+# Message buffer (debounce)
+redis>=5.0.0

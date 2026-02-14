@@ -1,0 +1,18 @@
+# Segredos e credenciais
+.env
+token.json
+credentials.json
+
+# Banco e cache (regeneráveis)
+.tmp/*.db
+.tmp/drive_cache.txt
+.tmp/tts_output.mp3
+.tmp/voice_*
+.tmp/logs/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/

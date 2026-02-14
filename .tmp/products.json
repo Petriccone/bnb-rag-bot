@@ -1,0 +1,18 @@
+[
+  {
+    "nome": "Modelo Básico",
+    "imagem": "",
+    "image_url": "https://via.placeholder.com/400/ffffff/333?text=Filtro+Basico",
+    "indicacao": "Ideal para quem tem espaço sob a pia",
+    "diferencial": "Remove cloro e partículas em duas etapas",
+    "preco": "Consulte"
+  },
+  {
+    "nome": "Modelo Premium",
+    "imagem": "",
+    "image_url": "https://via.placeholder.com/400/ffffff/333?text=Filtro+Premium",
+    "indicacao": "Para famílias maiores e água com mais impurezas",
+    "diferencial": "Filtração em 3 estágios, maior vazão",
+    "preco": "Consulte"
+  }
+]
