@@ -46,6 +46,17 @@ app.include_router(telegram.router, prefix="/api")
 app.include_router(telegram_webhook.router, prefix="/api/webhook/telegram")
 
 
+@app.get("/")
+def root():
+    """Rota raiz: evita 404 ao abrir a URL da API no navegador."""
+    return {
+        "message": "B&B RAG Platform API",
+        "docs": "/docs",
+        "health": "/health",
+        "api": "/api",
+    }
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
