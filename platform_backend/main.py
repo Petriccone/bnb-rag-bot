@@ -20,26 +20,26 @@ from fastapi.middleware.cors import CORSMiddleware
 from .routers import auth, tenants, agents, documents, metrics, whatsapp, telegram, telegram_webhook
 
 
+def _normalize_api_path(raw: str) -> str:
+    if not raw or not raw.startswith("/"):
+        return ""
+    return raw if raw.startswith("/api") else "/api" + raw
+
+
 class VercelPathFixMiddleware(BaseHTTPMiddleware):
-    """Na Vercel o path chega como "/". Corrige usando header X-Request-Path (frontend) ou prefixo /api."""
+    """Na Vercel o path chega como "/". Corrige com header X-Request-Path, query _path ou prefixo /api."""
     async def dispatch(self, request, call_next):
         path = request.scope.get("path") or ""
         method = request.scope.get("method") or ""
-        # 1) Frontend envia o path real no header (fix 405 na Vercel)
-        if (path == "/" or path == "/index.py") and method != "GET":
-            path_header = request.headers.get("x-request-path")
-            if path_header and path_header.startswith("/"):
-                path = path_header if path_header.startswith("/api") else "/api" + path_header
-                request.scope["path"] = path
-        # 2) Query string (quando dest usa ?path=/$1)
-        if (path == "/" or path == "/index.py") and method != "GET":
-            path_from_query = request.query_params.get("path")
-            if path_from_query and path_from_query.startswith("/"):
-                path = path_from_query if path_from_query.startswith("/api") else "/api" + path_from_query
-                request.scope["path"] = path
-        # 3) Path sem /api (ex: /auth/register quando função está em api/)
-        if path and not path.startswith("/api") and path != "/" and path != "/health":
-            if path.startswith("/auth") or path.startswith("/webhook") or path.startswith("/tenants") or path.startswith("/agents") or path.startswith("/documents") or path.startswith("/metrics") or path.startswith("/docs"):
+        fixed = ""
+        if path in ("/", "/index.py") and method != "GET":
+            fixed = _normalize_api_path(request.headers.get("x-request-path") or "")
+            if not fixed:
+                fixed = _normalize_api_path(request.query_params.get("_path") or request.query_params.get("path") or "")
+        if fixed:
+            request.scope["path"] = fixed
+        elif path and not path.startswith("/api") and path not in ("/", "/health"):
+            if any(path.startswith(x) for x in ("/auth", "/webhook", "/tenants", "/agents", "/documents", "/metrics", "/docs")):
                 request.scope["path"] = "/api" + path
         return await call_next(request)
 
