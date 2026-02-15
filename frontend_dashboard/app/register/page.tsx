@@ -19,14 +19,21 @@ export default function RegisterPage() {
     setError("");
     setLoading(true);
     try {
-      const { access_token } = await api<{ access_token: string }>("/auth/register", {
+      const data = await api<{ access_token: string }>("/auth/register", {
         method: "POST",
         body: JSON.stringify({ company_name, email, password, plan }),
       });
+      const access_token = data?.access_token;
+      if (!access_token) {
+        setError("Resposta inválida do servidor. Tente novamente.");
+        return;
+      }
       setToken(access_token);
       router.replace("/dashboard");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao cadastrar");
+    } catch (err: unknown) {
+      if (typeof window !== "undefined") console.error("[Cadastro] Erro:", err);
+      const message = err instanceof Error ? err.message : "Erro ao cadastrar. Tente novamente.";
+      setError(message && message.trim() ? message : "Erro ao cadastrar. Tente novamente.");
     } finally {
       setLoading(false);
     }
@@ -38,6 +45,11 @@ export default function RegisterPage() {
         <h1 className="text-2xl font-bold text-slate-800 mb-2">Cadastrar empresa</h1>
         <p className="text-slate-500 text-sm mb-6">Crie sua conta e seu primeiro tenant</p>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div role="alert" className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-red-700 text-sm">
+              {error}
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Nome da empresa</label>
             <input
@@ -80,7 +92,6 @@ export default function RegisterPage() {
               <option value="enterprise">Enterprise (ilimitado)</option>
             </select>
           </div>
-          {error && <p className="text-red-600 text-sm">{error}</p>}
           <button
             type="submit"
             disabled={loading}

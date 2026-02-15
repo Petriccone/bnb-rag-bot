@@ -17,14 +17,21 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
-      const { access_token } = await api<{ access_token: string }>("/auth/login", {
+      const data = await api<{ access_token: string }>("/auth/login", {
         method: "POST",
         body: JSON.stringify({ email, password }),
       });
+      const access_token = data?.access_token;
+      if (!access_token) {
+        setError("Resposta inválida do servidor. Tente novamente.");
+        return;
+      }
       setToken(access_token);
       router.replace("/dashboard");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao entrar");
+    } catch (err: unknown) {
+      if (typeof window !== "undefined") console.error("[Login] Erro:", err);
+      const message = err instanceof Error ? err.message : "Erro ao entrar. Tente novamente.";
+      setError(message || "Erro ao entrar. Tente novamente.");
     } finally {
       setLoading(false);
     }
@@ -36,6 +43,11 @@ export default function LoginPage() {
         <h1 className="text-2xl font-bold text-slate-800 mb-2">Entrar</h1>
         <p className="text-slate-500 text-sm mb-6">Dashboard B&B RAG</p>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div role="alert" className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-red-700 text-sm">
+              {error}
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
             <input
@@ -56,7 +68,6 @@ export default function LoginPage() {
               required
             />
           </div>
-          {error && <p className="text-red-600 text-sm">{error}</p>}
           <button
             type="submit"
             disabled={loading}
