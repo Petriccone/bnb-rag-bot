@@ -18,6 +18,8 @@ def _get_connection():
         raise ValueError(
             "PLATFORM_DATABASE_URL ou DATABASE_URL não configurado para o platform backend"
         )
+    if "supabase.com" in url and "?" not in url:
+        url = url + "?sslmode=require"
     return psycopg2.connect(url, cursor_factory=RealDictCursor)
 
 

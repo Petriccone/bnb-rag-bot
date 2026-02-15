@@ -102,8 +102,18 @@ def _process_telegram_update(tenant_id: str, update: dict) -> None:
             incoming_message=user_text,
             metadata={"lead_id": user_id, "is_audio": is_audio},
         )
-    except Exception:
-        _send_telegram_text(token, chat_id, "Desculpe, ocorreu um erro. Verifique se OPENROUTER_API_KEY e DATABASE_URL estão configurados no servidor.")
+    except Exception as e:
+        import traceback
+        print("[webhook telegram] run_agent error:", type(e).__name__, str(e))
+        traceback.print_exc()
+        err = str(e).lower()
+        if "connection" in err or "connect" in err or "database" in err or "operational" in err or "ssl" in err:
+            msg = "Erro de conexão com o banco. Confira DATABASE_URL (Supabase: use sslmode=require se precisar) e os logs na Vercel."
+        elif "module" in err or "import" in err or "not found" in err:
+            msg = "Erro de módulo no servidor. Veja os logs do deploy na Vercel (Função api/index.py)."
+        else:
+            msg = "Desculpe, ocorreu um erro. Veja os logs na Vercel (Deployments → Logs) para detalhes."
+        _send_telegram_text(token, chat_id, msg)
         return
 
     resposta_texto = (response.get("resposta_texto") or "").strip() if response else ""
