@@ -1,24 +1,22 @@
 """
 Configuração do platform backend (variáveis de ambiente).
+Usa só os.environ para não depender de pydantic_settings na Vercel.
 """
 import os
-from pydantic_settings import BaseSettings
 from functools import lru_cache
+from types import SimpleNamespace
 
 
-class Settings(BaseSettings):
-    database_url: str = ""
-    jwt_secret: str = os.environ.get("PLATFORM_JWT_SECRET", "change-me-in-production")
-    jwt_algorithm: str = "HS256"
-    jwt_expire_minutes: int = 60
-    upload_dir: str = os.environ.get("PLATFORM_UPLOAD_DIR", ".tmp/uploads")
-
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        extra = "ignore"
+def _env(key: str, default: str = "") -> str:
+    return os.environ.get(key, "").strip() or default
 
 
 @lru_cache
-def get_settings() -> Settings:
-    return Settings()
+def get_settings():
+    return SimpleNamespace(
+        database_url=_env("DATABASE_URL") or _env("PLATFORM_DATABASE_URL"),
+        jwt_secret=_env("PLATFORM_JWT_SECRET", "change-me-in-production"),
+        jwt_algorithm="HS256",
+        jwt_expire_minutes=60,
+        upload_dir=_env("PLATFORM_UPLOAD_DIR", ".tmp/uploads"),
+    )

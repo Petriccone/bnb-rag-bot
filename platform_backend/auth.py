@@ -1,12 +1,11 @@
 """
 Autenticação JWT para o platform backend.
 Senha: SHA-256 + bcrypt para aceitar qualquer tamanho (bcrypt sozinho limita a 72 bytes).
+Imports de bcrypt e jose são lazy para o módulo carregar na Vercel (evita crash por binário no cold start).
 """
 import hashlib
 from datetime import datetime, timedelta
 from typing import Optional
-import bcrypt
-from jose import JWTError, jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
@@ -21,14 +20,17 @@ def _to_bcrypt_input(password: str) -> bytes:
 
 
 def hash_password(password: str) -> str:
+    import bcrypt
     return bcrypt.hashpw(_to_bcrypt_input(password), bcrypt.gensalt()).decode("ascii")
 
 
 def verify_password(plain: str, hashed: str) -> bool:
+    import bcrypt
     return bcrypt.checkpw(_to_bcrypt_input(plain), hashed.encode("ascii"))
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+    from jose import jwt
     settings = get_settings()
     to_encode = data.copy()
     expire = datetime.utcnow() + (expires_delta or timedelta(minutes=settings.jwt_expire_minutes))
@@ -37,6 +39,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 
 
 def decode_token(token: str) -> Optional[dict]:
+    from jose import JWTError, jwt
     settings = get_settings()
     try:
         return jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])

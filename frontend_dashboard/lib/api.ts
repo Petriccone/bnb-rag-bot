@@ -1,7 +1,10 @@
-/** Base da API: sempre termina em /api (rotas do backend são /api/auth, /api/tenants, etc.) */
+/**
+ * Base da API (termina em /api).
+ * Padrão: mesma origem → Next.js faz rewrite de /api/* para BACKEND_URL (definir no projeto do dashboard).
+ * Opcional: NEXT_PUBLIC_API_URL = URL da API (ex.: https://bnb-rag-api.vercel.app) para chamar direto.
+ */
 function getApiBaseUrl(): string {
   const envUrl = process.env.NEXT_PUBLIC_API_URL;
-  // Em produção (navegador), se a variável não veio no build, tenta mesma origem (monorepo na Vercel)
   const raw =
     envUrl ||
     (typeof window !== "undefined" ? window.location.origin : "") ||
@@ -48,7 +51,7 @@ export async function api<T>(
     const msg = e instanceof Error ? e.message : "";
     if (msg === "Failed to fetch" || (e instanceof TypeError && msg.toLowerCase().includes("fetch"))) {
       const hint = typeof window !== "undefined" && window.location.hostname !== "127.0.0.1" && window.location.hostname !== "localhost"
-        ? " Configure NEXT_PUBLIC_API_URL na Vercel (Settings → Environment Variables) com a URL da API (ex.: https://bnb-rag-bot.vercel.app)."
+        ? " No projeto do dashboard (Vercel), defina BACKEND_URL com a URL da API (ex.: https://bnb-rag-api.vercel.app) e faça redeploy."
         : " Verifique se o backend está rodando (python run_platform_backend.py) e teste /health no navegador.";
       throw new Error("Não foi possível conectar à API." + hint);
     }

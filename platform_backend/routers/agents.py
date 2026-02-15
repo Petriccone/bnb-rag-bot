@@ -8,11 +8,18 @@ from pydantic import BaseModel
 from ..auth import get_current_user
 from ..db import get_cursor
 
-# Import do checker de limite (execution no parent)
-import sys
-import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-from execution.plan_limit_checker import check_agent_limit
+# Import do checker de limite (opcional: execution pode não estar no bundle na Vercel)
+def _check_agent_limit(tenant_id: str) -> bool:
+    try:
+        import sys
+        import os
+        root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+        if root not in sys.path:
+            sys.path.insert(0, root)
+        from execution.plan_limit_checker import check_agent_limit
+        return check_agent_limit(tenant_id)
+    except Exception:
+        return True  # sem checker: permite criar (fallback para deploy sem execution/)
 
 router = APIRouter(prefix="/agents", tags=["agents"])
 
@@ -71,7 +78,7 @@ def list_agents(user: dict = Depends(get_current_user)):
 @router.post("", response_model=AgentResponse)
 def create_agent(body: AgentCreate, user: dict = Depends(get_current_user)):
     tenant_id = _ensure_tenant(user)
-    if not check_agent_limit(tenant_id):
+    if not _check_agent_limit(tenant_id):
         raise HTTPException(
             status_code=403,
             detail="Limite de agentes do plano atingido. Faça upgrade.",

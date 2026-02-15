@@ -2,8 +2,10 @@
 Platform Backend (SaaS) — FastAPI.
 Autenticação JWT, CRUD tenant/agentes, upload documentos, métricas, WhatsApp (stub).
 Consumido apenas pelo frontend_dashboard; o core não chama o platform.
+Routers carregados um a um para não derrubar a app na Vercel se um falhar no import.
 """
 import os
+import traceback
 from contextlib import asynccontextmanager
 from pathlib import Path
 try:
@@ -14,11 +16,27 @@ except ImportError:
     pass
 
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import JSONResponse
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .routers import auth, tenants, agents, documents, metrics, whatsapp, telegram, telegram_webhook
+_import_errors = []
+
+def _safe_import(name: str):
+    try:
+        mod = __import__(f"platform_backend.routers.{name}", fromlist=["router"])
+        return getattr(mod, "router", None)
+    except Exception as e:
+        _import_errors.append({"router": name, "error": str(e), "traceback": traceback.format_exc()})
+        return None
+
+auth = _safe_import("auth")
+tenants = _safe_import("tenants")
+agents = _safe_import("agents")
+documents = _safe_import("documents")
+metrics = _safe_import("metrics")
+whatsapp = _safe_import("whatsapp")
+telegram = _safe_import("telegram")
+telegram_webhook = _safe_import("telegram_webhook")
 
 
 def _normalize_api_path(raw: str) -> str:
@@ -32,30 +50,6 @@ class VercelPathFixMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         path = request.scope.get("path") or ""
         method = request.scope.get("method") or ""
-        # #region agent log — debug 405: retorna o que o servidor recebeu para qualquer POST que não seja /api/*
-        if method == "POST" and not path.startswith("/api"):
-            q = request.query_params
-            debug_payload = {
-                "debug": True,
-                "hypothesisId": "H1,H5",
-                "scope_path": path,
-                "method": method,
-                "query_path": q.get("_path"),
-                "query_path_alt": q.get("path"),
-                "header_x_request_path": request.headers.get("x-request-path"),
-                "query_keys": list(q.keys()),
-            }
-            try:
-                import json
-                root = Path(__file__).resolve().parent.parent
-                log_path = root / ".cursor" / "debug.log"
-                log_path.parent.mkdir(parents=True, exist_ok=True)
-                with open(log_path, "a", encoding="utf-8") as f:
-                    f.write(json.dumps({"message": "vercel_debug", "data": debug_payload, "timestamp": __import__("time").time() * 1000}) + "\n")
-            except Exception:
-                pass
-            return JSONResponse(status_code=200, content=debug_payload)
-        # #endregion
         fixed = ""
         if path in ("/", "/index.py") and method != "GET":
             fixed = _normalize_api_path(request.headers.get("x-request-path") or "")
@@ -97,14 +91,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(auth.router, prefix="/api")
-app.include_router(tenants.router, prefix="/api")
-app.include_router(agents.router, prefix="/api")
-app.include_router(documents.router, prefix="/api")
-app.include_router(metrics.router, prefix="/api")
-app.include_router(whatsapp.router, prefix="/api")
-app.include_router(telegram.router, prefix="/api")
-app.include_router(telegram_webhook.router, prefix="/api/webhook/telegram")
+if auth:
+    app.include_router(auth, prefix="/api")
+if tenants:
+    app.include_router(tenants, prefix="/api")
+if agents:
+    app.include_router(agents, prefix="/api")
+if documents:
+    app.include_router(documents, prefix="/api")
+if metrics:
+    app.include_router(metrics, prefix="/api")
+if whatsapp:
+    app.include_router(whatsapp, prefix="/api")
+if telegram:
+    app.include_router(telegram, prefix="/api")
+if telegram_webhook:
+    app.include_router(telegram_webhook, prefix="/api/webhook/telegram")
 
 
 @app.get("/")
@@ -121,3 +123,9 @@ def root():
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/import-error")
+def import_error():
+    """Diagnóstico: lista routers que falharam no import (para debug na Vercel)."""
+    return {"errors": _import_errors}

@@ -1,14 +1,15 @@
 """
 Conexão Postgres para o platform backend.
 Usa PLATFORM_DATABASE_URL se existir; senão DATABASE_URL (evita conflito com env do sistema).
+Import de psycopg2 é lazy para o módulo carregar na Vercel mesmo sem lib nativa no cold start.
 """
 import os
-import psycopg2
-from psycopg2.extras import RealDictCursor
 from contextlib import contextmanager
 
 
 def _get_connection():
+    import psycopg2
+    from psycopg2.extras import RealDictCursor
     url = (
         os.environ.get("PLATFORM_DATABASE_URL", "").strip()
         or os.environ.get("DATABASE_URL", "").strip()
