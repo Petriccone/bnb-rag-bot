@@ -60,7 +60,7 @@ def run_agent_facade(
             "Foque nas perguntas SPIN e no relacionamento consultivo."
         )
 
-    recent_log = get_recent_log(lead_id, limit=20, tenant_id=tenant_id, agent_id=agent_id)
+    recent_log = get_recent_log(lead_id, limit=12, tenant_id=tenant_id, agent_id=agent_id)
 
     from .llm_orchestrator import run as llm_run
     out = llm_run(

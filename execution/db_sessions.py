@@ -683,8 +683,8 @@ def get_recent_log(
             with conn.cursor() as cur:
                 cur.execute(
                     """SELECT role, content_type, content, timestamp FROM tenant_conversation_log
-                       WHERE tenant_id = %s AND lead_id = %s ORDER BY timestamp DESC LIMIT %s""",
-                    (tenant_id, user_id, limit),
+                       WHERE tenant_id = %s AND lead_id = %s AND agent_id = %s ORDER BY timestamp DESC LIMIT %s""",
+                    (tenant_id, user_id, agent_id, limit),
                 )
                 rows = cur.fetchall()
             out = []

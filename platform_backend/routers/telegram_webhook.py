@@ -84,7 +84,8 @@ def _process_telegram_update(tenant_id: str, update: dict) -> None:
         _send_telegram_text(token, chat_id, "Não consegui entender. Pode mandar em texto ou áudio?")
         return
 
-    # Buffer com debounce (apenas texto): agrupa mensagens antes de responder, se REDIS_URL estiver definido
+    # Buffer com debounce (apenas texto): agrupa mensagens antes de responder. Só ativo com REDIS_URL (ex.: Upstash na Vercel).
+    # Sem Redis, cada mensagem é respondida na hora (comportamento normal em serverless).
     if not is_audio:
         try:
             from ..webhook_buffer import buffer_available, add_to_buffer_and_schedule
