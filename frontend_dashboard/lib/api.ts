@@ -32,6 +32,9 @@ export async function api<T>(
   const base = getApiBaseUrl().replace(/\/+$/, "");
   const p = path.startsWith("/") ? path : `/${path}`;
   const url = `${base}${p}`;
+  // Na Vercel o path chega como "/" no backend; enviamos o path real para o middleware corrigir (405 fix)
+  const apiPath = "/api" + (p.startsWith("/") ? p : `/${p}`);
+  (headers as Record<string, string>)["X-Request-Path"] = apiPath;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 15000);
   let res: Response;

@@ -21,16 +21,23 @@ from .routers import auth, tenants, agents, documents, metrics, whatsapp, telegr
 
 
 class VercelPathFixMiddleware(BaseHTTPMiddleware):
-    """Na Vercel (api/index.py), o path pode chegar sem o prefixo /api (ex: /auth/register). Corrige para /api/..."""
+    """Na Vercel o path chega como "/". Corrige usando header X-Request-Path (frontend) ou prefixo /api."""
     async def dispatch(self, request, call_next):
         path = request.scope.get("path") or ""
         method = request.scope.get("method") or ""
-        # Vercel pode passar path real no query (quando dest usa ?path=/$1)
+        # 1) Frontend envia o path real no header (fix 405 na Vercel)
+        if (path == "/" or path == "/index.py") and method != "GET":
+            path_header = request.headers.get("x-request-path")
+            if path_header and path_header.startswith("/"):
+                path = path_header if path_header.startswith("/api") else "/api" + path_header
+                request.scope["path"] = path
+        # 2) Query string (quando dest usa ?path=/$1)
         if (path == "/" or path == "/index.py") and method != "GET":
             path_from_query = request.query_params.get("path")
             if path_from_query and path_from_query.startswith("/"):
-                path = path_from_query
+                path = path_from_query if path_from_query.startswith("/api") else "/api" + path_from_query
                 request.scope["path"] = path
+        # 3) Path sem /api (ex: /auth/register quando função está em api/)
         if path and not path.startswith("/api") and path != "/" and path != "/health":
             if path.startswith("/auth") or path.startswith("/webhook") or path.startswith("/tenants") or path.startswith("/agents") or path.startswith("/documents") or path.startswith("/metrics") or path.startswith("/docs"):
                 request.scope["path"] = "/api" + path
