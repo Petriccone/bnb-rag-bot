@@ -15,7 +15,6 @@ from .db_sessions import (
     update_classification,
     update_state,
 )
-from .llm_orchestrator import run as llm_run
 from .state_machine import apply_transition
 
 
@@ -63,6 +62,7 @@ def run_agent_facade(
 
     recent_log = get_recent_log(lead_id, limit=20, tenant_id=tenant_id, agent_id=agent_id)
 
+    from .llm_orchestrator import run as llm_run
     out = llm_run(
         user_id=lead_id,
         user_message=user_text,

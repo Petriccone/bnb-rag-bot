@@ -1,0 +1,12 @@
+# Dependências da função serverless api/index.py (Vercel usa este arquivo quando está em api/)
+# Inclui openai explicitamente para o webhook Telegram (LLM via OpenRouter)
+openai>=1.40.0
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+httpx>=0.25.0
+psycopg2-binary>=2.9.0
+python-jose[cryptography]>=3.3.0
+bcrypt>=4.0.0
+python-multipart>=0.0.6
+pydantic[email]>=2.0.0
+email-validator>=2.0.0
