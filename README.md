@@ -2,7 +2,7 @@
 
 Este é um bot consultivo de vendas para Telegram, pronto para ser adaptado para qualquer produto ou serviço. Ele vem equipado com uma estrutura de IA de ponta para guiar usuários desde o primeiro contato até o pós-venda.
 
-✨ **[Veja o vídeo de demonstração!](https://youtube.com)** (coloque seu link aqui)
+✨ **[Veja o vídeo de demonstração!](https://youtube.com)** 
 
 ## 🚀 Rode em 5 Minutos (Modo Básico)
 
