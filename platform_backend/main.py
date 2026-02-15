@@ -72,6 +72,12 @@ class VercelPathFixMiddleware(BaseHTTPMiddleware):
 @asynccontextmanager
 async def lifespan(app):
     """Inicia worker do buffer (webhook Telegram) se REDIS_URL estiver definido."""
+    # Na Vercel, threads em background não funcionam bem (congelam entre requests).
+    # Desativamos para evitar overhead e erros.
+    if os.environ.get("VERCEL"):
+        yield
+        return
+
     try:
         from .webhook_buffer import start_worker_if_needed
         start_worker_if_needed()
