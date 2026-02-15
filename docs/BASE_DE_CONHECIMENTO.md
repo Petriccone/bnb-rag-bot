@@ -21,11 +21,11 @@ A base de conhecimento permite que o bot use **documentos enviados no dashboard*
    Opcional: `OPENAI_EMBEDDING_MODEL=text-embedding-3-small` (padrão, 1536 dimensões).
 
 3. **Upload no dashboard**  
-   Em **Base de conhecimento**, envie arquivos **PDF** ou **TXT**. Eles são salvos, divididos em trechos (chunks), transformados em embeddings e gravados na tabela `document_chunks`. O bot passa a usar esses trechos na resposta.
+   Em **Base de conhecimento**, envie arquivos **PDF**, **TXT**, **Excel** (.xlsx, .xls) ou **imagens** (PNG, JPG/JPEG). São salvos, o texto é extraído (em imagens via OpenAI Vision), dividido em trechos (chunks), transformado em embeddings e gravado em `document_chunks`. O bot usa esses trechos na resposta.
 
 ## Fluxo
 
-- **Upload:** o backend salva o arquivo, insere em `documents` e chama o ingest (extração de texto → chunk → embedding → insert em `document_chunks`). Só .pdf e .txt são processados.
+- **Upload:** o backend salva o arquivo, insere em `documents` e chama o ingest (extração de texto → chunk → embedding → insert em `document_chunks`). Formatos processados: .pdf, .txt, .xlsx, .xls, .png, .jpg, .jpeg. Imagens usam OpenAI Vision para gerar descrição textual.
 - **Resposta do bot:** quando o tenant **não** tem pasta do Google Drive configurada, o `agent_facade` usa a busca vetorial por tenant (`knowledge_rag.search_document_chunks`). O texto da mensagem do lead é convertido em embedding e comparado aos chunks; os mais similares viram contexto para o LLM.
 - **Prioridade de contexto:** 1) Pasta do Drive do tenant (`settings.drive_folder_id`), 2) variável global `DRIVE_FOLDER_ID`, 3) base de conhecimento (document_chunks), 4) mensagem de “não configurado”.
 

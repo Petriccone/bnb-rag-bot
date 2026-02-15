@@ -5,7 +5,7 @@ import Link from "next/link";
 import { api, getApiBase } from "@/lib/api";
 
 type Tenant = { id: string; company_name: string };
-type BotInfo = { bot_username: string | null; connected: boolean };
+type BotInfo = { bot_username: string | null; connected: boolean; agent_id?: string | null };
 type Agent = { id: string; name: string; niche: string | null; prompt_custom: string | null; active: boolean };
 
 function getErrorMessage(err: unknown): string {
@@ -139,6 +139,22 @@ export default function TelegramPage() {
   const tenantId = tenant?.id ?? "";
   const botUsername = botInfo?.bot_username ?? "";
   const connected = botInfo?.connected ?? false;
+  const telegramAgentId = botInfo?.agent_id ?? null;
+
+  const handleSetTelegramAgent = async (agentId: string) => {
+    const value = agentId === "" ? null : agentId;
+    setError(null);
+    try {
+      await api("/telegram/agent", {
+        method: "PATCH",
+        body: JSON.stringify({ agent_id: value }),
+      });
+      load();
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
+    }
+  };
+
   const deepLink =
     tenantId && botUsername
       ? `https://t.me/${botUsername}?start=t_${tenantId}`
@@ -206,6 +222,24 @@ export default function TelegramPage() {
                   Desconectar
                 </button>
               </div>
+              {agents.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-slate-200">
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Agente deste bot (Telegram)</label>
+                  <select
+                    value={telegramAgentId ?? ""}
+                    onChange={(e) => handleSetTelegramAgent(e.target.value)}
+                    className="w-full max-w-xs rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white"
+                  >
+                    <option value="">Primeiro agente ativo</option>
+                    {agents.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name} {a.niche ? `(${a.niche})` : ""} {!a.active ? "— inativo" : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-slate-500 mt-1">Escolha qual agente responde neste Telegram. Pode ser diferente do WhatsApp.</p>
+                </div>
+              )}
             </div>
           ) : (
             <div className="space-y-4">

@@ -5,6 +5,18 @@ import { api } from "@/lib/api";
 
 type Doc = { id: string; file_path: string; embedding_namespace: string };
 
+/** URL do POST /api/documents: evita barra dupla e garante /api no path. */
+function getDocumentsUploadUrl(): string {
+  const envUrl = process.env.NEXT_PUBLIC_API_URL;
+  const raw =
+    (typeof envUrl === "string" ? envUrl.trim() : "") ||
+    (typeof window !== "undefined" ? window.location.origin : "") ||
+    "http://127.0.0.1:8000";
+  const origin = String(raw).replace(/\/+$/, "");
+  const apiBase = origin.endsWith("/api") ? origin : `${origin}/api`;
+  return `${apiBase.replace(/\/+$/, "")}/documents`;
+}
+
 export default function DocumentsPage() {
   const [list, setList] = useState<Doc[]>([]);
   const [err, setErr] = useState("");
@@ -27,18 +39,31 @@ export default function DocumentsPage() {
     const form = new FormData();
     form.append("file", file);
     const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-    const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+    const url = getDocumentsUploadUrl();
     try {
-      const res = await fetch(`${base}/documents`, {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
+      const res = await fetch(url, {
         method: "POST",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: form,
+        signal: controller.signal,
       });
-      if (!res.ok) throw new Error(await res.json().then((x: { detail?: string }) => x.detail).catch(() => "Erro"));
+      clearTimeout(timeoutId);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ detail: res.statusText }));
+        const detail = typeof body.detail === "string" ? body.detail : body.detail?.message ?? "Erro no servidor";
+        throw new Error(detail);
+      }
       setFile(null);
       load();
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Erro no upload");
+      if (e instanceof Error) {
+        if (e.name === "AbortError") setErr("Upload demorou muito (timeout). Tente um arquivo menor.");
+        else if (e.message === "Failed to fetch" || e.message.includes("fetch"))
+          setErr("Não foi possível conectar à API. Verifique se o backend está rodando e se NEXT_PUBLIC_API_URL está correto no .env do dashboard.");
+        else setErr(e.message);
+      } else setErr("Erro no upload");
     } finally {
       setUploading(false);
     }
@@ -58,7 +83,7 @@ export default function DocumentsPage() {
     <div>
       <h1 className="text-2xl font-bold text-slate-800 mb-6">Base de conhecimento</h1>
       <p className="text-slate-600 mb-6">
-        Envie PDF ou TXT para alimentar a base de conhecimento. O bot (Telegram/WhatsApp) usa esses textos para responder com contexto. Formatos aceitos: .pdf e .txt. O processamento é automático após o upload.
+        Envie documentos ou imagens para alimentar a base de conhecimento. O bot (Telegram/WhatsApp) usa esse conteúdo para responder com contexto. Formatos aceitos: PDF, TXT, Excel (.xlsx, .xls), imagens (PNG, JPG). O processamento é automático após o upload.
       </p>
 
       <form onSubmit={handleUpload} className="flex flex-wrap items-end gap-4 mb-8">
@@ -66,6 +91,7 @@ export default function DocumentsPage() {
           <label className="block text-sm font-medium text-slate-700 mb-1">Arquivo</label>
           <input
             type="file"
+            accept=".pdf,.txt,.xlsx,.xls,.png,.jpg,.jpeg"
             onChange={(e) => setFile(e.target.files?.[0] ?? null)}
             className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700"
           />

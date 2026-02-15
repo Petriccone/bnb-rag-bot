@@ -25,6 +25,11 @@ class WhatsAppStatusResponse(BaseModel):
     message: str
     phone_number_id_mask: str | None = None
     connection_type: str | None = None  # "meta" | "evolution"
+    agent_id: str | None = None
+
+
+class WhatsAppAgentUpdate(BaseModel):
+    agent_id: str | None = None
 
 
 class WhatsAppConnectRequest(BaseModel):
@@ -41,7 +46,7 @@ class EvolutionConnectRequest(BaseModel):
 def _get_config(tenant_id: str) -> dict | None:
     with get_cursor() as cur:
         cur.execute(
-            "SELECT phone_number_id, access_token_encrypted FROM tenant_whatsapp_config WHERE tenant_id = %s",
+            "SELECT phone_number_id, access_token_encrypted, agent_id FROM tenant_whatsapp_config WHERE tenant_id = %s",
             (tenant_id,),
         )
         row = cur.fetchone()
@@ -51,13 +56,18 @@ def _get_config(tenant_id: str) -> dict | None:
         token = decrypt_token(row["access_token_encrypted"])
     except Exception:
         return None
-    return {"phone_number_id": row["phone_number_id"], "access_token": token}
+    agent_id = row.get("agent_id")
+    return {
+        "phone_number_id": row["phone_number_id"],
+        "access_token": token,
+        "agent_id": str(agent_id) if agent_id else None,
+    }
 
 
 def _get_evolution_config(tenant_id: str) -> dict | None:
     with get_cursor() as cur:
         cur.execute(
-            "SELECT base_url, api_key_encrypted, instance_name FROM tenant_evolution_config WHERE tenant_id = %s",
+            "SELECT base_url, api_key_encrypted, instance_name, agent_id FROM tenant_evolution_config WHERE tenant_id = %s",
             (tenant_id,),
         )
         row = cur.fetchone()
@@ -67,7 +77,13 @@ def _get_evolution_config(tenant_id: str) -> dict | None:
         api_key = decrypt_token(row["api_key_encrypted"])
     except Exception:
         return None
-    return {"base_url": row["base_url"].rstrip("/"), "api_key": api_key, "instance_name": row["instance_name"]}
+    agent_id = row.get("agent_id")
+    return {
+        "base_url": row["base_url"].rstrip("/"),
+        "api_key": api_key,
+        "instance_name": row["instance_name"],
+        "agent_id": str(agent_id) if agent_id else None,
+    }
 
 
 def _evolution_available() -> bool:
@@ -93,6 +109,7 @@ def whatsapp_status(user: dict = Depends(get_current_user)):
             message="WhatsApp conectado via Evolution API (QR Code).",
             phone_number_id_mask=None,
             connection_type="evolution",
+            agent_id=evo.get("agent_id"),
         )
     cfg = _get_config(tenant_id)
     if not cfg:
@@ -107,6 +124,7 @@ def whatsapp_status(user: dict = Depends(get_current_user)):
         message="WhatsApp Cloud API conectado.",
         phone_number_id_mask=pid[:8] + "…" + pid[-4:] if len(pid) > 12 else "***",
         connection_type="meta",
+        agent_id=cfg.get("agent_id"),
     )
 
 
@@ -127,6 +145,25 @@ def whatsapp_connect(body: WhatsAppConnectRequest, user: dict = Depends(get_curr
             (tenant_id, body.phone_number_id.strip(), enc),
         )
     return {"ok": True, "message": "WhatsApp conectado."}
+
+
+@router.patch("/agent")
+def whatsapp_set_agent(body: WhatsAppAgentUpdate, user: dict = Depends(get_current_user)):
+    """Define qual agente esta conta WhatsApp usa. agent_id null = primeiro agente ativo do tenant."""
+    tenant_id = user.get("tenant_id")
+    if not tenant_id:
+        raise HTTPException(status_code=403, detail="Usuário sem tenant.")
+    agent_id = (body.agent_id or "").strip() or None
+    with get_cursor() as cur:
+        cur.execute(
+            "UPDATE tenant_whatsapp_config SET agent_id = %s, updated_at = NOW() WHERE tenant_id = %s",
+            (agent_id, tenant_id),
+        )
+        cur.execute(
+            "UPDATE tenant_evolution_config SET agent_id = %s, updated_at = NOW() WHERE tenant_id = %s",
+            (agent_id, tenant_id),
+        )
+    return {"ok": True, "agent_id": agent_id}
 
 
 @router.delete("/disconnect")
@@ -240,21 +277,22 @@ def webhook_verify(
     raise HTTPException(status_code=403, detail="Verify token inválido")
 
 
-def _get_tenant_and_token_by_phone_number_id(phone_number_id: str) -> tuple[str | None, str | None]:
-    """Retorna (tenant_id, access_token) ou (None, None)."""
+def _get_tenant_and_token_by_phone_number_id(phone_number_id: str) -> tuple[str | None, str | None, str | None]:
+    """Retorna (tenant_id, access_token, agent_id) ou (None, None, None)."""
     with get_cursor() as cur:
         cur.execute(
-            "SELECT tenant_id, access_token_encrypted FROM tenant_whatsapp_config WHERE phone_number_id = %s",
+            "SELECT tenant_id, access_token_encrypted, agent_id FROM tenant_whatsapp_config WHERE phone_number_id = %s",
             (phone_number_id,),
         )
         row = cur.fetchone()
     if not row:
-        return None, None
+        return None, None, None
     try:
         token = decrypt_token(row["access_token_encrypted"])
-        return str(row["tenant_id"]), token
+        agent_id = str(row["agent_id"]) if row.get("agent_id") else None
+        return str(row["tenant_id"]), token, agent_id
     except Exception:
-        return None, None
+        return None, None, None
 
 
 async def _send_whatsapp_text(phone_number_id: str, access_token: str, to_wa_id: str, text: str) -> bool:
@@ -291,7 +329,7 @@ async def webhook_receive(request: Request):
             phone_number_id = metadata.get("phone_number_id")
             if not phone_number_id:
                 continue
-            tenant_id, access_token = _get_tenant_and_token_by_phone_number_id(phone_number_id)
+            tenant_id, access_token, agent_id = _get_tenant_and_token_by_phone_number_id(phone_number_id)
             if not tenant_id or not access_token:
                 continue
             for msg in value.get("messages", []):
@@ -302,7 +340,7 @@ async def webhook_receive(request: Request):
                 if not from_wa or not text_body.strip():
                     continue
                 from adapters.whatsapp_adapter import get_agent_response
-                response = get_agent_response(tenant_id, str(from_wa), text_body.strip(), is_audio=False)
+                response = get_agent_response(tenant_id, str(from_wa), text_body.strip(), is_audio=False, agent_id=agent_id)
                 reply_text = (response.get("resposta_texto") or "").strip()
                 if reply_text:
                     await _send_whatsapp_text(phone_number_id, access_token, str(from_wa), reply_text)
@@ -315,7 +353,7 @@ def _get_tenant_and_evolution_by_instance(instance_name: str) -> tuple[str | Non
     """Retorna (tenant_id, config) para envio via Evolution API."""
     with get_cursor() as cur:
         cur.execute(
-            "SELECT tenant_id, base_url, api_key_encrypted, instance_name FROM tenant_evolution_config WHERE instance_name = %s",
+            "SELECT tenant_id, base_url, api_key_encrypted, instance_name, agent_id FROM tenant_evolution_config WHERE instance_name = %s",
             (instance_name,),
         )
         row = cur.fetchone()
@@ -325,10 +363,12 @@ def _get_tenant_and_evolution_by_instance(instance_name: str) -> tuple[str | Non
         api_key = decrypt_token(row["api_key_encrypted"])
     except Exception:
         return None, None
+    agent_id = str(row["agent_id"]) if row.get("agent_id") else None
     return str(row["tenant_id"]), {
         "base_url": row["base_url"].rstrip("/"),
         "api_key": api_key,
         "instance_name": row["instance_name"],
+        "agent_id": agent_id,
     }
 
 
@@ -400,7 +440,7 @@ async def evolution_webhook(request: Request):
         if not tenant_id or not config:
             continue
         from adapters.whatsapp_adapter import get_agent_response
-        response = get_agent_response(tenant_id, remote_jid, text or "", is_audio=False)
+        response = get_agent_response(tenant_id, remote_jid, text or "", is_audio=False, agent_id=config.get("agent_id"))
         reply_text = (response.get("resposta_texto") or "").strip()
         if reply_text:
             await _send_evolution_text(

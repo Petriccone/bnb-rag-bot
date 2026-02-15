@@ -73,8 +73,9 @@ async def upload_document(
         row = cur.fetchone()
         doc_id = str(row["id"])
 
-    # Ingestão para base de conhecimento (chunks + embeddings). Só .txt e .pdf.
-    if doc_id and file_path.lower().endswith((".txt", ".pdf")):
+    # Ingestão para base de conhecimento: .txt, .pdf, .xlsx, .xls, .png, .jpg, .jpeg
+    _ingest_extensions = (".txt", ".pdf", ".xlsx", ".xls", ".png", ".jpg", ".jpeg")
+    if doc_id and any(file_path.lower().endswith(ext) for ext in _ingest_extensions):
         try:
             import sys
             from pathlib import Path

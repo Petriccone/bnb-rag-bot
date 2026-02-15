@@ -9,11 +9,19 @@ function getApiBaseUrl(): string {
     envUrl ||
     (typeof window !== "undefined" ? window.location.origin : "") ||
     "http://127.0.0.1:8000";
-  const base = String(raw).replace(/\/+$/, "");
-  return base.endsWith("/api") ? base : base + "/api";
+  const base = String(raw).replace(/\/+$/, "").replace(/(\/)+/g, "/");
+  const withApi = base.endsWith("/api") ? base : base + "/api";
+  return withApi.replace(/(\/)+/g, "/");
 }
 export function getApiBase(): string {
   return getApiBaseUrl();
+}
+
+/** URL absoluta para um path da API (evita barra dupla). Use path sem barra no início. */
+export function getApiUrl(path: string): string {
+  const base = getApiBaseUrl().replace(/\/+$/, "");
+  const p = path.replace(/^\/+/, "");
+  return p ? `${base}/${p}` : base;
 }
 
 function getToken(): string | null {

@@ -8,7 +8,10 @@ type Status = {
   message: string;
   phone_number_id_mask?: string | null;
   connection_type?: string | null;
+  agent_id?: string | null;
 };
+
+type Agent = { id: string; name: string; niche: string | null; active: boolean };
 
 type EvolutionAvailable = { available: boolean };
 
@@ -28,6 +31,7 @@ export default function WhatsAppPage() {
   const [connectingEvo, setConnectingEvo] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const [error, setError] = useState("");
+  const [agents, setAgents] = useState<Agent[]>([]);
 
   function loadStatus() {
     api<Status>("/whatsapp/status")
@@ -38,7 +42,24 @@ export default function WhatsAppPage() {
   useEffect(() => {
     loadStatus();
     api<EvolutionAvailable>("/whatsapp/evolution-available").then((r) => setEvolutionAvailable(r.available)).catch(() => setEvolutionAvailable(false));
+    api<Agent[]>("/agents").then(setAgents).catch(() => setAgents([]));
   }, []);
+
+  const whatsappAgentId = status?.agent_id ?? null;
+
+  async function handleSetWhatsAppAgent(agentId: string) {
+    const value = agentId === "" ? null : agentId;
+    setError("");
+    try {
+      await api("/whatsapp/agent", {
+        method: "PATCH",
+        body: JSON.stringify({ agent_id: value }),
+      });
+      loadStatus();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao atualizar agente");
+    }
+  }
 
   async function handleRequestQr() {
     setError("");
@@ -134,14 +155,34 @@ export default function WhatsAppPage() {
               )}
             </p>
             {status.connected && (
-              <button
-                type="button"
-                onClick={handleDisconnect}
-                disabled={disconnecting}
-                className="mt-4 rounded-lg border border-red-200 text-red-700 px-4 py-2 hover:bg-red-50 disabled:opacity-50"
-              >
-                {disconnecting ? "Desconectando..." : "Desconectar"}
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={handleDisconnect}
+                  disabled={disconnecting}
+                  className="mt-4 rounded-lg border border-red-200 text-red-700 px-4 py-2 hover:bg-red-50 disabled:opacity-50"
+                >
+                  {disconnecting ? "Desconectando..." : "Desconectar"}
+                </button>
+                {agents.length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-slate-200">
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Agente desta conta (WhatsApp)</label>
+                    <select
+                      value={whatsappAgentId ?? ""}
+                      onChange={(e) => handleSetWhatsAppAgent(e.target.value)}
+                      className="w-full max-w-xs rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white"
+                    >
+                      <option value="">Primeiro agente ativo</option>
+                      {agents.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.name} {a.niche ? `(${a.niche})` : ""} {!a.active ? "— inativo" : ""}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-slate-500 mt-1">Escolha qual agente responde no WhatsApp. Pode ser diferente do Telegram.</p>
+                  </div>
+                )}
+              </>
             )}
           </>
         ) : (

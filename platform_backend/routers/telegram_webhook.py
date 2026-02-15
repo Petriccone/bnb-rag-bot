@@ -97,11 +97,12 @@ def _process_telegram_update(tenant_id: str, update: dict) -> None:
     response = None
     try:
         from core.agent_runner import run_agent
+        agent_id = cfg.get("agent_id")
         response = run_agent(
             tenant_id=tenant_id,
             channel="telegram",
             incoming_message=user_text,
-            metadata={"lead_id": user_id, "is_audio": is_audio},
+            metadata={"lead_id": user_id, "is_audio": is_audio, "agent_id": agent_id},
         )
     except Exception as e:
         import traceback

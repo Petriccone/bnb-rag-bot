@@ -13,17 +13,24 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 
-def get_agent_response(tenant_id: str, lead_id: str, text: str, is_audio: bool = False) -> dict[str, Any]:
+def get_agent_response(
+    tenant_id: str,
+    lead_id: str,
+    text: str,
+    is_audio: bool = False,
+    agent_id: str | None = None,
+) -> dict[str, Any]:
     """
     Chama o core e retorna o dict de resposta (resposta_texto, enviar_audio, enviar_imagens, modelos).
     lead_id: identificador do contato no canal (ex.: número WhatsApp).
+    agent_id: agente desta conta WhatsApp; None = primeiro agente ativo do tenant.
     """
     from core.agent_runner import run_agent
     return run_agent(
         tenant_id=tenant_id,
         channel="whatsapp",
         incoming_message=text or "",
-        metadata={"lead_id": lead_id, "is_audio": is_audio},
+        metadata={"lead_id": lead_id, "is_audio": is_audio, "agent_id": agent_id},
     )
 
 

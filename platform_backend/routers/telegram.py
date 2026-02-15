@@ -19,6 +19,11 @@ TELEGRAM_WEBHOOK_BASE = os.environ.get("TELEGRAM_WEBHOOK_BASE_URL", "").strip().
 class TelegramBotInfo(BaseModel):
     bot_username: str | None = None
     connected: bool = False
+    agent_id: str | None = None
+
+
+class TelegramAgentUpdate(BaseModel):
+    agent_id: str | None = None
 
 
 class TelegramConnectRequest(BaseModel):
@@ -33,6 +38,7 @@ def _ensure_telegram_table():
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                 tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE UNIQUE,
                 bot_token_encrypted TEXT NOT NULL,
+                agent_id UUID REFERENCES agents(id) ON DELETE SET NULL,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                 updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             )
@@ -42,7 +48,7 @@ def _ensure_telegram_table():
 def _get_telegram_config(tenant_id: str) -> dict | None:
     with get_cursor() as cur:
         cur.execute(
-            "SELECT bot_token_encrypted FROM tenant_telegram_config WHERE tenant_id = %s",
+            "SELECT bot_token_encrypted, agent_id FROM tenant_telegram_config WHERE tenant_id = %s",
             (tenant_id,),
         )
         row = cur.fetchone()
@@ -52,7 +58,8 @@ def _get_telegram_config(tenant_id: str) -> dict | None:
         token = decrypt_token(row["bot_token_encrypted"])
     except Exception:
         return None
-    return {"bot_token": token}
+    agent_id = row.get("agent_id")
+    return {"bot_token": token, "agent_id": str(agent_id) if agent_id else None}
 
 
 def _normalize_bot_token(raw: str) -> str:
@@ -153,9 +160,13 @@ def telegram_status(user: dict = Depends(get_current_user)):
         )
     try:
         me = _validate_telegram_token(cfg["bot_token"])
-        return TelegramBotInfo(bot_username=me.get("username"), connected=True)
+        return TelegramBotInfo(
+            bot_username=me.get("username"),
+            connected=True,
+            agent_id=cfg.get("agent_id"),
+        )
     except Exception:
-        return TelegramBotInfo(connected=True)
+        return TelegramBotInfo(connected=True, agent_id=cfg.get("agent_id"))
 
 
 @router.get("/bot-info", response_model=TelegramBotInfo)
@@ -163,6 +174,24 @@ def telegram_bot_info(user: dict = Depends(get_current_user)):
     """Retorna @ do bot e se está conectado (para o link no dashboard)."""
     s = telegram_status(user)
     return s
+
+
+@router.patch("/agent")
+def telegram_set_agent(body: TelegramAgentUpdate, user: dict = Depends(get_current_user)):
+    """Define qual agente este bot do Telegram usa. agent_id null = primeiro agente ativo do tenant."""
+    tenant_id = user.get("tenant_id")
+    if not tenant_id:
+        raise HTTPException(status_code=403, detail="Usuário sem tenant.")
+    cfg = _get_telegram_config(tenant_id)
+    if not cfg:
+        raise HTTPException(status_code=400, detail="Conecte o Telegram antes de escolher o agente.")
+    agent_id = body.agent_id.strip() or None if body.agent_id else None
+    with get_cursor() as cur:
+        cur.execute(
+            "UPDATE tenant_telegram_config SET agent_id = %s, updated_at = NOW() WHERE tenant_id = %s",
+            (agent_id, tenant_id),
+        )
+    return {"ok": True, "agent_id": agent_id}
 
 
 def _extract_token_from_request(body: dict, request: Request) -> str | None:
@@ -216,15 +245,17 @@ async def telegram_connect(request: Request, user: dict = Depends(get_current_us
         err_msg = _get_telegram_error_message(token)
         raise HTTPException(status_code=502, detail=err_msg)
     enc = encrypt_token(token)
+    agent_id = (body.get("agent_id") or "").strip() or None
     _ensure_telegram_table()
     with get_cursor() as cur:
         cur.execute(
-            """INSERT INTO tenant_telegram_config (tenant_id, bot_token_encrypted, updated_at)
-               VALUES (%s, %s, NOW())
+            """INSERT INTO tenant_telegram_config (tenant_id, bot_token_encrypted, agent_id, updated_at)
+               VALUES (%s, %s, %s, NOW())
                ON CONFLICT (tenant_id) DO UPDATE SET
                  bot_token_encrypted = EXCLUDED.bot_token_encrypted,
+                 agent_id = COALESCE(EXCLUDED.agent_id, tenant_telegram_config.agent_id),
                  updated_at = NOW()""",
-            (tenant_id, enc),
+            (tenant_id, enc, agent_id),
         )
     return {"ok": True, "message": "Telegram conectado. Seu bot já pode receber mensagens."}
 

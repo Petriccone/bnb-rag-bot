@@ -107,11 +107,12 @@ def _flush_one(tenant_id: str, user_id: str, chat_id: int) -> None:
     if not cfg:
         return
     token = cfg["bot_token"]
+    agent_id = cfg.get("agent_id")
     response = run_agent(
         tenant_id=tenant_id,
         channel="telegram",
         incoming_message=combined,
-        metadata={"lead_id": user_id, "is_audio": False},
+        metadata={"lead_id": user_id, "is_audio": False, "agent_id": agent_id},
     )
     resposta_texto = (response.get("resposta_texto") or "").strip()
     if resposta_texto:
