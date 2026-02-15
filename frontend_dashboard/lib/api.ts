@@ -1,7 +1,12 @@
 /** Base da API: sempre termina em /api (rotas do backend são /api/auth, /api/tenants, etc.) */
 function getApiBaseUrl(): string {
-  const raw = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api";
-  const base = raw.replace(/\/+$/, "");
+  const envUrl = process.env.NEXT_PUBLIC_API_URL;
+  // Em produção (navegador), se a variável não veio no build, tenta mesma origem (monorepo na Vercel)
+  const raw =
+    envUrl ||
+    (typeof window !== "undefined" ? window.location.origin : "") ||
+    "http://127.0.0.1:8000";
+  const base = String(raw).replace(/\/+$/, "");
   return base.endsWith("/api") ? base : base + "/api";
 }
 export function getApiBase(): string {
