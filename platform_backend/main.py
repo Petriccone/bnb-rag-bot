@@ -14,6 +14,7 @@ except ImportError:
     pass
 
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import JSONResponse
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -31,6 +32,30 @@ class VercelPathFixMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         path = request.scope.get("path") or ""
         method = request.scope.get("method") or ""
+        # #region agent log — debug 405: retorna o que o servidor recebeu (path, query, header)
+        if path in ("/", "/index.py") and method == "POST":
+            q = request.query_params
+            debug_payload = {
+                "debug": True,
+                "hypothesisId": "H1,H5",
+                "scope_path": path,
+                "method": method,
+                "query_path": q.get("_path"),
+                "query_path_alt": q.get("path"),
+                "header_x_request_path": request.headers.get("x-request-path"),
+                "query_keys": list(q.keys()),
+            }
+            try:
+                import json
+                root = Path(__file__).resolve().parent.parent
+                log_path = root / ".cursor" / "debug.log"
+                log_path.parent.mkdir(parents=True, exist_ok=True)
+                with open(log_path, "a", encoding="utf-8") as f:
+                    f.write(json.dumps({"message": "vercel_debug", "data": debug_payload, "timestamp": __import__("time").time() * 1000}) + "\n")
+            except Exception:
+                pass
+            return JSONResponse(status_code=200, content=debug_payload)
+        # #endregion
         fixed = ""
         if path in ("/", "/index.py") and method != "GET":
             fixed = _normalize_api_path(request.headers.get("x-request-path") or "")
