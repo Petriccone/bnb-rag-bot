@@ -4,6 +4,18 @@ O projeto usa **dois aplicativos**: frontend (Next.js) e backend (FastAPI). Na V
 
 ---
 
+## Backend em produção: duas estratégias
+
+| Estratégia | Quando usar | Comando / Onde |
+|------------|-------------|----------------|
+| **Vercel (serverless)** | Dashboard + API na Vercel, escala automática, sem servidor 24/7 | Deploy do projeto API na Vercel (abaixo). Já é produção ao publicar. |
+| **Self-hosted (Railway, Render, VPS)** | Controle total, worker do buffer (Redis) ativo, sempre no ar | `python run_platform_backend_production.py` com variáveis de ambiente. |
+
+- **Vercel:** não precisa de script; o backend sobe como função serverless. Configure `DATABASE_URL`, `PLATFORM_JWT_SECRET`, etc. no painel.
+- **Self-hosted:** use `run_platform_backend_production.py` (sem `reload`, host/porta por env). Variáveis opcionais: `PLATFORM_HOST=0.0.0.0`, `PLATFORM_PORT=8000`, `LOG_LEVEL=info`.
+
+---
+
 ## 1. Projeto 1 — API (backend)
 
 O backend precisa estar no ar primeiro, para você usar a URL dele no frontend.
@@ -13,7 +25,7 @@ O backend precisa estar no ar primeiro, para você usar a URL dele no frontend.
 1. **New Project** → importe o repositório.
 2. **Root Directory:** deixe em branco (raiz do repo).
 3. **Framework Preset:** Other (ou None). Não use Next.js aqui.
-4. **Build Command:** vazio (a Vercel usa `api/index.py` e instala deps automaticamente).
+4. **Build Command:** vazio (a Vercel usa `index.py` na raiz e instala deps automaticamente).
 5. **Install Command:** `pip install -r requirements.txt` (se quiser garantir).
 6. **Output Directory:** vazio.
 

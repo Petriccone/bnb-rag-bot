@@ -14,10 +14,21 @@ try:
 except ImportError:
     pass
 
+from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .routers import auth, tenants, agents, documents, metrics, whatsapp, telegram, telegram_webhook
+
+
+class VercelPathFixMiddleware(BaseHTTPMiddleware):
+    """Na Vercel, o path pode chegar sem o prefixo /api (ex: /auth/register). Corrige para /api/..."""
+    async def dispatch(self, request, call_next):
+        path = request.scope.get("path") or ""
+        if path and not path.startswith("/api") and path != "/" and path != "/health":
+            if path.startswith("/auth") or path.startswith("/webhook") or path.startswith("/tenants") or path.startswith("/agents") or path.startswith("/documents") or path.startswith("/metrics") or path.startswith("/docs"):
+                request.scope["path"] = "/api" + path
+        return await call_next(request)
 
 # #region agent log
 def _debug_log(message: str, data: dict, hypothesis_id: str = ""):
@@ -49,6 +60,7 @@ async def lifespan(app):
 
 app = FastAPI(title="B&B RAG Platform API", version="1.0.0", lifespan=lifespan)
 
+app.add_middleware(VercelPathFixMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

@@ -1,5 +1,7 @@
-# Railway — deploy do bot SDR Telegram
-# O bot usa long polling (worker), não abre porta HTTP.
+# Railway — comando de start (o que você coloca aqui sobrescreve o da interface)
+# Opções:
+#   Bot Telegram 24/7:  python run_production.py
+#   API do dashboard:  python run_platform_backend_production.py
 
 [build]
 builder = "nixpacks"

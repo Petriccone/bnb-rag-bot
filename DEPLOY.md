@@ -101,13 +101,20 @@ Qualquer uma dessas opções deixa o bot rodando independente do seu computador,
 
 ---
 
-## 5. Deploy na Vercel (produção)
+## 5. Platform Backend em produção (API do dashboard)
+
+- **Na Vercel:** o backend já está em produção quando você faz o deploy do projeto API (ver seção 6). Basta configurar as variáveis de ambiente.
+- **Em Railway/Render/VPS:** use `python run_platform_backend_production.py` (sem reload, porta por env). Defina `PLATFORM_HOST=0.0.0.0` e `PLATFORM_PORT=8000` (ou a porta do serviço). As mesmas variáveis da API (DATABASE_URL, PLATFORM_JWT_SECRET, etc.) valem.
+
+---
+
+## 6. Deploy na Vercel (produção)
 
 Para subir o **dashboard** e a **API** na Vercel em modo produção, use **dois projetos** (mesmo repositório): um para o backend (FastAPI) e outro para o frontend (Next.js). Passo a passo e variáveis: **[docs/DEPLOY_VERCEL.md](docs/DEPLOY_VERCEL.md)**.
 
 ---
 
-## 6. Platform (dashboard) — Telegram por token
+## 7. Platform (dashboard) — Telegram por token
 
 Se você usa o **dashboard** e a opção **Conexão Telegram** (usuário cola o token do bot e o bot começa a rodar):
 
