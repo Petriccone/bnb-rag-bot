@@ -48,10 +48,29 @@ def run_agent_facade(
     session = get_or_create_session(lead_id, tenant_id=tenant_id, agent_id=agent_id)
     current_state = session["current_state"]
 
-    if drive_folder_id_override:
+    # DRIVE_RAG_DISABLED=1 desativa o RAG do Google Drive (usa só base de conhecimento por documentos)
+    drive_disabled = os.environ.get("DRIVE_RAG_DISABLED", "").strip() in ("1", "true", "yes")
+
+    if not drive_disabled and drive_folder_id_override:
         rag_context = _rag_for_folder(drive_folder_id_override, user_text, current_state)
-    elif os.environ.get("DRIVE_FOLDER_ID", "").strip():
+    elif not drive_disabled and os.environ.get("DRIVE_FOLDER_ID", "").strip():
         rag_context = _drive_search(user_text, current_state)
+    elif tenant_id:
+        # Base de conhecimento por documentos enviados no dashboard (pgvector)
+        try:
+            from .knowledge_rag import search_document_chunks
+            rag_context = search_document_chunks(tenant_id, user_text, limit=6)
+        except Exception as e:
+            rag_context = (
+                "CONTEXTO: Base de conhecimento indisponível. Não invente dados. "
+                f"(Erro: {e})"
+            )
+        if not rag_context or not rag_context.strip():
+            rag_context = (
+                "CONTEXTO: Nenhum documento na base de conhecimento. "
+                "Envie arquivos em Base de conhecimento no dashboard (PDF ou TXT). "
+                "Não invente preços ou especificações."
+            )
     else:
         rag_context = (
             "CONTEXTO: A base de conhecimento (Google Drive) não está configurada. "

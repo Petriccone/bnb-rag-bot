@@ -63,6 +63,7 @@ async def upload_document(
     with open(file_path, "wb") as f:
         f.write(content)
     namespace = embedding_namespace or f"tenant_{tenant_id}"
+    doc_id = None
     with get_cursor() as cur:
         cur.execute(
             """INSERT INTO documents (tenant_id, file_path, embedding_namespace)
@@ -70,8 +71,23 @@ async def upload_document(
             (tenant_id, file_path, namespace),
         )
         row = cur.fetchone()
+        doc_id = str(row["id"])
+
+    # Ingestão para base de conhecimento (chunks + embeddings). Só .txt e .pdf.
+    if doc_id and file_path.lower().endswith((".txt", ".pdf")):
+        try:
+            import sys
+            from pathlib import Path
+            root = Path(__file__).resolve().parents[2]
+            if str(root) not in sys.path:
+                sys.path.insert(0, str(root))
+            from execution.document_ingest import ingest_document
+            ingest_document(file_path, tenant_id, doc_id)
+        except Exception:
+            pass  # Upload já foi salvo; ingest pode ser refeito depois
+
     return DocumentResponse(
-        id=str(row["id"]),
+        id=doc_id,
         tenant_id=str(row["tenant_id"]),
         file_path=row["file_path"],
         embedding_namespace=row["embedding_namespace"],
@@ -89,6 +105,16 @@ def delete_document(document_id: str, user: dict = Depends(get_current_user)):
         row = cur.fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="Documento não encontrado")
+    try:
+        import sys
+        from pathlib import Path
+        root = Path(__file__).resolve().parents[2]
+        if str(root) not in sys.path:
+            sys.path.insert(0, str(root))
+        from execution.document_ingest import delete_chunks_for_document
+        delete_chunks_for_document(document_id)
+    except Exception:
+        pass
     if os.path.isfile(row["file_path"]):
         try:
             os.remove(row["file_path"])

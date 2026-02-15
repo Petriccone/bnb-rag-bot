@@ -38,6 +38,9 @@ export default function NewAgentPage() {
         </Link>
         <h1 className="text-2xl font-bold text-slate-800">Novo agente</h1>
       </div>
+      <p className="text-slate-600 text-sm mb-6 max-w-xl">
+        Este agente pode ser usado no bot do Telegram. <strong>Treinar</strong> o agente é preencher nome, nicho e o prompt customizado (instruções de como o bot deve responder). Depois de criar, ative o agente e conecte o Telegram na página Conexão Telegram.
+      </p>
       <form onSubmit={handleSubmit} className="max-w-xl space-y-4">
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">Nome</label>

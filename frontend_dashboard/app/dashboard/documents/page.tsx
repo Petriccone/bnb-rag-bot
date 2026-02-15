@@ -58,7 +58,7 @@ export default function DocumentsPage() {
     <div>
       <h1 className="text-2xl font-bold text-slate-800 mb-6">Base de conhecimento</h1>
       <p className="text-slate-600 mb-6">
-        Envie documentos para o RAG do seu tenant. O namespace é isolado por tenant.
+        Envie PDF ou TXT para alimentar a base de conhecimento. O bot (Telegram/WhatsApp) usa esses textos para responder com contexto. Formatos aceitos: .pdf e .txt. O processamento é automático após o upload.
       </p>
 
       <form onSubmit={handleUpload} className="flex flex-wrap items-end gap-4 mb-8">

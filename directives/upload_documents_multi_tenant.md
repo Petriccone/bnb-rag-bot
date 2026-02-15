@@ -13,4 +13,4 @@ Cada tenant pode enviar sua base de conhecimento (documentos) com namespace veto
 1. Validar tenant_id e arquivo.
 2. Gerar ou receber embedding_namespace (ex.: f"tenant_{tenant_id}").
 3. Inserir em `documents` (tenant_id, file_path, embedding_namespace).
-4. Processar arquivo para índice vetorial quando houver pipeline de embedding.
+4. Processar arquivo para índice vetorial: feito em `execution/document_ingest.py` (extração de texto, chunk, embedding OpenAI, insert em `document_chunks`). Chamado pelo backend após upload de .pdf ou .txt. Ver `docs/BASE_DE_CONHECIMENTO.md`.

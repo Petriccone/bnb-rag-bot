@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { api, getApiBase } from "@/lib/api";
 
 type Tenant = { id: string; company_name: string };
 type BotInfo = { bot_username: string | null; connected: boolean };
+type Agent = { id: string; name: string; niche: string | null; prompt_custom: string | null; active: boolean };
 
 function getErrorMessage(err: unknown): string {
   if (err && typeof err === "object" && "message" in err) {
@@ -22,6 +24,7 @@ export default function TelegramPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [serverTokenCheck, setServerTokenCheck] = useState<{ valid: boolean; username?: string; error?: string } | null>(null);
+  const [agents, setAgents] = useState<Agent[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const load = () => {
@@ -29,6 +32,7 @@ export default function TelegramPage() {
     api<BotInfo>("/telegram/status")
       .then((data) => setBotInfo(data))
       .catch(() => setBotInfo(null));
+    api<Agent[]>("/agents").then(setAgents).catch(() => setAgents([]));
   };
 
   useEffect(() => {
@@ -140,11 +144,48 @@ export default function TelegramPage() {
       ? `https://t.me/${botUsername}?start=t_${tenantId}`
       : "";
 
+  const hasActiveAgent = agents.some((a) => a.active);
+
   return (
     <div>
       <h1 className="text-2xl font-bold text-slate-800 mb-6">Conexão Telegram</h1>
 
       <div className="max-w-xl space-y-6">
+        {agents.length === 0 && (
+          <div className="rounded-lg border-2 border-amber-200 bg-amber-50 p-6">
+            <h2 className="font-semibold text-amber-900 mb-2">Antes de conectar o Telegram</h2>
+            <p className="text-amber-800 text-sm mb-3">
+              O bot do Telegram usa um <strong>agente</strong> que você cria e treina no dashboard. Siga os passos:
+            </p>
+            <ol className="list-decimal list-inside text-amber-800 text-sm space-y-2 mb-4">
+              <li>
+                <Link href="/dashboard/agents/new" className="text-blue-600 hover:underline font-medium">
+                  Crie um agente
+                </Link>{" "}
+                em <Link href="/dashboard/agents" className="text-blue-600 hover:underline">Meus agentes</Link>.
+              </li>
+              <li>
+                <strong>Treine o agente:</strong> preencha nome, nicho e prompt customizado (instruções de como o bot deve responder).
+              </li>
+              <li>Deixe o agente <strong>Ativo</strong> (edite e marque como ativo se precisar).</li>
+              <li>Volte aqui e conecte o Telegram com o token do BotFather.</li>
+            </ol>
+            <Link
+              href="/dashboard/agents/new"
+              className="inline-block rounded-lg bg-amber-600 text-white px-4 py-2 text-sm font-medium hover:bg-amber-700"
+            >
+              Criar meu primeiro agente
+            </Link>
+          </div>
+        )}
+
+        {agents.length > 0 && !hasActiveAgent && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-4 text-sm text-amber-800">
+            Você tem agente(s), mas nenhum está <strong>Ativo</strong>. O Telegram só responde com um agente ativo.{" "}
+            <Link href="/dashboard/agents" className="text-blue-600 hover:underline">Editar em Meus agentes</Link>.
+          </div>
+        )}
+
         <div className="rounded-lg border border-slate-200 bg-white p-6">
           <h2 className="font-semibold text-slate-800 mb-2">Webhook (opcional)</h2>
           <p className="text-slate-600 text-sm mb-3">

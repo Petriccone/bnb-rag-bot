@@ -70,21 +70,20 @@ def run_agent(
     else:
         agent = tenant_config.get_agent_by_id(agent_id)
     if not agent_id or not agent:
-        # Fallback: tenant existe mas não tem agente ativo — usa fluxo legado com tenant_id (sessão/log isolados)
-        from execution.agent_facade import run_agent_facade
+        # Tenant existe mas não tem agente ativo — exige criar/ativar agente em Meus Agentes
+        return {
+            "resposta_texto": "Nenhum agente configurado para este bot. No dashboard: vá em Meus Agentes, crie um agente, configure o prompt (treine) e deixe-o ativo. Depois envie uma mensagem aqui novamente.",
+            "enviar_audio": False,
+            "proximo_estado": "descoberta",
+            "enviar_imagens": False,
+            "modelos": [],
+        }
+    # DRIVE_RAG_DISABLED=1: não usar pasta do Drive; RAG só pela base de conhecimento (documentos).
+    drive_disabled = os.environ.get("DRIVE_RAG_DISABLED", "").strip() in ("1", "true", "yes")
+    if not drive_disabled:
         settings = tenant.get("settings") or {}
-        drive_folder_id_override = settings.get("drive_folder_id") if isinstance(settings, dict) else None
-        return run_agent_facade(
-            lead_id=lead_id,
-            user_text=incoming_message.strip(),
-            is_audio=is_audio,
-            tenant_id=tenant_id,
-            agent_id=None,
-            drive_folder_id_override=drive_folder_id_override,
-        )
-    settings = tenant.get("settings") or {}
-    if isinstance(settings, dict) and settings.get("drive_folder_id"):
-        drive_folder_id_override = settings["drive_folder_id"]
+        if isinstance(settings, dict) and settings.get("drive_folder_id"):
+            drive_folder_id_override = settings["drive_folder_id"]
 
     from execution.agent_facade import run_agent_facade
     return run_agent_facade(
