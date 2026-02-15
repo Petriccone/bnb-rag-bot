@@ -32,8 +32,8 @@ class VercelPathFixMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         path = request.scope.get("path") or ""
         method = request.scope.get("method") or ""
-        # #region agent log — debug 405: retorna o que o servidor recebeu (path, query, header)
-        if path in ("/", "/index.py") and method == "POST":
+        # #region agent log — debug 405: retorna o que o servidor recebeu para qualquer POST que não seja /api/*
+        if method == "POST" and not path.startswith("/api"):
             q = request.query_params
             debug_payload = {
                 "debug": True,
