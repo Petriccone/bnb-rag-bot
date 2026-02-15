@@ -11,10 +11,18 @@ def _get_key():
 
 
 def encrypt_token(token: str) -> str:
-    from cryptography.fernet import Fernet
+    try:
+        from cryptography.fernet import Fernet
+    except ImportError:
+        # Fallback ou erro explícito se a lib não estiver instalada
+        raise ImportError("A biblioteca 'cryptography' não está instalada. Adicione ao requirements.txt.")
     return Fernet(_get_key()).encrypt(token.encode()).decode()
 
 
 def decrypt_token(encrypted: str) -> str:
-    from cryptography.fernet import Fernet
+    try:
+        from cryptography.fernet import Fernet
+    except ImportError:
+        raise ImportError("A biblioteca 'cryptography' não está instalada. Adicione ao requirements.txt.")
     return Fernet(_get_key()).decrypt(encrypted.encode()).decode()
+
