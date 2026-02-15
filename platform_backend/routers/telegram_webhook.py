@@ -104,13 +104,16 @@ def _process_telegram_update(tenant_id: str, update: dict) -> None:
         )
     except Exception as e:
         import traceback
-        print("[webhook telegram] run_agent error:", type(e).__name__, str(e))
+        err_str = str(e)
+        err_lower = err_str.lower()
+        print("[webhook telegram] run_agent error:", type(e).__name__, err_str)
         traceback.print_exc()
-        err = str(e).lower()
-        if "connection" in err or "connect" in err or "database" in err or "operational" in err or "ssl" in err:
-            msg = "Erro de conexão com o banco. Confira DATABASE_URL (Supabase: use sslmode=require se precisar) e os logs na Vercel."
-        elif "module" in err or "import" in err or "not found" in err:
-            msg = "Erro de módulo no servidor. Veja os logs do deploy na Vercel (Função api/index.py)."
+        if "connection" in err_lower or "connect" in err_lower or "database" in err_lower or "operational" in err_lower or "ssl" in err_lower:
+            msg = "Erro de conexão com o banco. Confira DATABASE_URL (Supabase: use sslmode=require) e os logs na Vercel."
+        elif "module" in err_lower or "import" in err_lower or "not found" in err_lower:
+            # Inclui o nome do módulo faltante para o usuário poder corrigir (ex.: No module named 'openai')
+            hint = err_str[:80] if len(err_str) <= 80 else err_str[:77] + "..."
+            msg = f"Erro de módulo no servidor: {hint}. Instale o pacote no requirements.txt e faça redeploy."
         else:
             msg = "Desculpe, ocorreu um erro. Veja os logs na Vercel (Deployments → Logs) para detalhes."
         _send_telegram_text(token, chat_id, msg)
