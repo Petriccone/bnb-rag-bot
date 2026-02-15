@@ -93,21 +93,28 @@ def _process_telegram_update(tenant_id: str, update: dict) -> None:
         except Exception:
             pass
 
-    from core.agent_runner import run_agent
-    response = run_agent(
-        tenant_id=tenant_id,
-        channel="telegram",
-        incoming_message=user_text,
-        metadata={"lead_id": user_id, "is_audio": is_audio},
-    )
+    response = None
+    try:
+        from core.agent_runner import run_agent
+        response = run_agent(
+            tenant_id=tenant_id,
+            channel="telegram",
+            incoming_message=user_text,
+            metadata={"lead_id": user_id, "is_audio": is_audio},
+        )
+    except Exception:
+        _send_telegram_text(token, chat_id, "Desculpe, ocorreu um erro. Verifique se OPENROUTER_API_KEY e DATABASE_URL estão configurados no servidor.")
+        return
 
-    resposta_texto = (response.get("resposta_texto") or "").strip()
+    resposta_texto = (response.get("resposta_texto") or "").strip() if response else ""
     if resposta_texto:
         _send_telegram_text(token, chat_id, resposta_texto)
+    elif response is not None:
+        _send_telegram_text(token, chat_id, "Recebi sua mensagem. Se o agente não respondeu, o administrador pode precisar configurar OPENROUTER_API_KEY no servidor.")
 
     # Opcional: imagens e áudio (resposta TTS) — envio simples
-    enviar_imagens = response.get("enviar_imagens", False)
-    modelos = response.get("modelos") or []
+    enviar_imagens = response.get("enviar_imagens", False) if response else False
+    modelos = (response.get("modelos") or []) if response else []
     if enviar_imagens and modelos:
         try:
             from execution.telegram_handler import _find_products_by_names
@@ -124,7 +131,7 @@ def _process_telegram_update(tenant_id: str, update: dict) -> None:
         except Exception:
             pass
 
-    if response.get("enviar_audio") and resposta_texto and is_audio:
+    if (response or {}).get("enviar_audio") and resposta_texto and is_audio:
         try:
             from execution.tts import synthesize as tts_synthesize
             audio_path = tts_synthesize(resposta_texto)
@@ -176,18 +183,13 @@ def _send_telegram_voice(token: str, chat_id: int, voice_path: str) -> bool:
 
 @router.post("/{tenant_id}")
 async def telegram_webhook_receive(tenant_id: str, request: Request):
-    """Recebe o update do Telegram (POST com JSON) e processa de forma síncrona."""
+    """Recebe o update do Telegram (POST com JSON). Processa na mesma requisição para funcionar na Vercel (serverless mata a execução ao retornar)."""
     try:
         body = await request.json()
     except Exception:
         raise HTTPException(status_code=400, detail="Body inválido")
-    # Processar em background para retornar 200 rápido ao Telegram (evita retry)
-    import threading
-    def run():
-        try:
-            _process_telegram_update(tenant_id, body)
-        except Exception:
-            pass
-    t = threading.Thread(target=run)
-    t.start()
+    try:
+        _process_telegram_update(tenant_id, body)
+    except Exception:
+        pass  # Telegram já recebe 200; falhas não devem derrubar o webhook
     return JSONResponse(content={"ok": True}, status_code=200)

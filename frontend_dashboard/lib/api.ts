@@ -1,7 +1,7 @@
 /**
  * Base da API (termina em /api).
- * Padrão: mesma origem → Next.js faz rewrite de /api/* para BACKEND_URL (definir no projeto do dashboard).
- * Opcional: NEXT_PUBLIC_API_URL = URL da API (ex.: https://bnb-rag-api.vercel.app) para chamar direto.
+ * Em produção: use NEXT_PUBLIC_API_URL = URL da API (chamada direta, evita 405 do proxy).
+ * Desenvolvimento: mesma origem ou http://127.0.0.1:8000.
  */
 function getApiBaseUrl(): string {
   const envUrl = process.env.NEXT_PUBLIC_API_URL;

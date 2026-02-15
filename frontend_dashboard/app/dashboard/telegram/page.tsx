@@ -145,25 +145,10 @@ export default function TelegramPage() {
       <h1 className="text-2xl font-bold text-slate-800 mb-6">Conexão Telegram</h1>
 
       <div className="max-w-xl space-y-6">
-        {/* Modo que funciona: run_bot.py */}
-        <div className="rounded-lg border-2 border-emerald-200 bg-emerald-50 p-6">
-          <h2 className="font-semibold text-emerald-900 mb-2">Fazer o bot responder no Telegram</h2>
-          <p className="text-emerald-800 text-sm mb-3">
-            O chat do bot <strong>não depende deste dashboard</strong>. Na pasta raiz do projeto (onde está o <code className="bg-white/70 px-1 rounded">.env</code>), abra um terminal e rode:
-          </p>
-          <pre className="bg-white border border-emerald-200 rounded px-3 py-2 text-sm font-mono text-slate-800 overflow-x-auto">
-            python run_bot.py
-          </pre>
-          <p className="text-emerald-800 text-sm mt-2">
-            Deixe o terminal aberto. O bot usa o <code className="bg-white/70 px-1 rounded">TELEGRAM_BOT_TOKEN</code> do <code className="bg-white/70 px-1 rounded">.env</code> e responde por long polling. Abra o bot no Telegram e converse.
-          </p>
-        </div>
-
-        {/* Conectar por webhook (opcional) */}
         <div className="rounded-lg border border-slate-200 bg-white p-6">
           <h2 className="font-semibold text-slate-800 mb-2">Webhook (opcional)</h2>
           <p className="text-slate-600 text-sm mb-3">
-            Só use esta seção se quiser que o bot receba mensagens via URL pública (ngrok, servidor). Caso contrário, use <code className="bg-slate-100 px-1 rounded">python run_bot.py</code> acima.
+            Use esta seção para o bot receber mensagens via URL pública (servidor, Vercel). Conecte com o token do servidor ou cole o token abaixo.
           </p>
           {connected ? (
             <div className="space-y-3">
@@ -310,13 +295,6 @@ export default function TelegramPage() {
           </div>
         )}
 
-        <div className="rounded-lg border border-slate-200 bg-white p-6">
-          <h2 className="font-semibold text-slate-800 mb-2">Resumo</h2>
-          <ul className="text-sm text-slate-600 space-y-2 list-disc list-inside">
-            <li><strong>Modo simples:</strong> <code className="bg-slate-100 px-1 rounded">python run_bot.py</code> na pasta do projeto — o bot responde usando o token do .env.</li>
-            <li><strong>Webhook:</strong> opcional; exige TELEGRAM_WEBHOOK_BASE_URL e &quot;Conectar com token do servidor&quot;.</li>
-          </ul>
-        </div>
       </div>
     </div>
   );
