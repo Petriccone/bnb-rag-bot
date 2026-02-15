@@ -3,7 +3,6 @@ Platform Backend (SaaS) — FastAPI.
 Autenticação JWT, CRUD tenant/agentes, upload documentos, métricas, WhatsApp (stub).
 Consumido apenas pelo frontend_dashboard; o core não chama o platform.
 """
-import json
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -22,51 +21,25 @@ from .routers import auth, tenants, agents, documents, metrics, whatsapp, telegr
 
 
 class VercelPathFixMiddleware(BaseHTTPMiddleware):
-    """Na Vercel, o path pode chegar como / ou sem /api. Corrige usando query string ou prefixo /api."""
+    """Na Vercel (api/index.py), o path pode chegar sem o prefixo /api (ex: /auth/register). Corrige para /api/..."""
     async def dispatch(self, request, call_next):
         path = request.scope.get("path") or ""
         method = request.scope.get("method") or ""
-        # #region agent log
-        if "auth" in path or path == "/" or path.startswith("/api") or "index.py" in path:
-            _debug_log("middleware_request", {"path": path, "method": method}, "H2")
-        # #endregion
-        # Vercel pode passar path real no query (dest: index.py?path=/$1)
+        # Vercel pode passar path real no query (quando dest usa ?path=/$1)
         if (path == "/" or path == "/index.py") and method != "GET":
             path_from_query = request.query_params.get("path")
             if path_from_query and path_from_query.startswith("/"):
                 path = path_from_query
                 request.scope["path"] = path
-                # #region agent log
-                _debug_log("middleware_rewrite_from_query", {"new_path": path}, "H2")
-                # #endregion
         if path and not path.startswith("/api") and path != "/" and path != "/health":
             if path.startswith("/auth") or path.startswith("/webhook") or path.startswith("/tenants") or path.startswith("/agents") or path.startswith("/documents") or path.startswith("/metrics") or path.startswith("/docs"):
                 request.scope["path"] = "/api" + path
-                # #region agent log
-                _debug_log("middleware_rewrite", {"new_path": request.scope["path"]}, "H2")
-                # #endregion
         return await call_next(request)
-
-# #region agent log
-def _debug_log(message: str, data: dict, hypothesis_id: str = ""):
-    try:
-        root = Path(__file__).resolve().parent.parent
-        log_path = root / ".cursor" / "debug.log"
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        payload = {"message": message, "data": data, "hypothesisId": hypothesis_id, "timestamp": __import__("time").time() * 1000}
-        with open(log_path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(payload, ensure_ascii=False) + "\n")
-    except Exception:
-        pass
-# #endregion
 
 
 @asynccontextmanager
 async def lifespan(app):
     """Inicia worker do buffer (webhook Telegram) se REDIS_URL estiver definido."""
-    # #region agent log
-    _debug_log("lifespan_start", {"db_set": bool(os.environ.get("DATABASE_URL") or os.environ.get("PLATFORM_DATABASE_URL")), "redis_set": bool(os.environ.get("REDIS_URL"))}, "H1")
-    # #endregion
     try:
         from .webhook_buffer import start_worker_if_needed
         start_worker_if_needed()
@@ -99,9 +72,6 @@ app.include_router(telegram_webhook.router, prefix="/api/webhook/telegram")
 @app.get("/")
 def root():
     """Rota raiz: evita 404 ao abrir a URL da API no navegador."""
-    # #region agent log
-    _debug_log("root_hit", {"path": "/"}, "H2")
-    # #endregion
     return {
         "message": "B&B RAG Platform API",
         "docs": "/docs",
@@ -112,7 +82,4 @@ def root():
 
 @app.get("/health")
 def health():
-    # #region agent log
-    _debug_log("health_hit", {"path": "/health"}, "H2")
-    # #endregion
     return {"status": "ok"}

@@ -32,15 +32,6 @@ export async function api<T>(
   const base = getApiBaseUrl().replace(/\/+$/, "");
   const p = path.startsWith("/") ? path : `/${path}`;
   const url = `${base}${p}`;
-  // #region agent log
-  if (typeof fetch !== "undefined") {
-    fetch("http://127.0.0.1:7242/ingest/bda2a585-6330-4387-9d59-18331d5ab5ec", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ location: "api.ts:api", message: "fetch_start", data: { url, method: options.method || "GET", path }, timestamp: Date.now(), hypothesisId: "H1" }),
-    }).catch(() => {});
-  }
-  // #endregion
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 15000);
   let res: Response;
@@ -48,15 +39,6 @@ export async function api<T>(
     res = await fetch(url, { ...options, headers, signal: controller.signal });
   } catch (e) {
     clearTimeout(timeoutId);
-    // #region agent log
-    if (typeof fetch !== "undefined") {
-      fetch("http://127.0.0.1:7242/ingest/bda2a585-6330-4387-9d59-18331d5ab5ec", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ location: "api.ts:catch", message: "fetch_error", data: { name: e instanceof Error ? e.name : "", msg: e instanceof Error ? e.message : String(e) }, timestamp: Date.now(), hypothesisId: "H1" }),
-      }).catch(() => {});
-    }
-    // #endregion
     if (e instanceof Error && e.name === "AbortError") {
       throw new Error("A requisição demorou muito. Tente novamente.");
     }
@@ -80,15 +62,6 @@ export async function api<T>(
           ? (detail[0].msg ?? detail[0].message ?? JSON.stringify(detail[0]))
           : String(detail ?? res.status);
     const fullMsg = (msg && String(msg).trim()) ? msg : `Erro do servidor (${res.status})`;
-    // #region agent log
-    if (typeof fetch !== "undefined") {
-      fetch("http://127.0.0.1:7242/ingest/bda2a585-6330-4387-9d59-18331d5ab5ec", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ location: "api.ts:!res.ok", message: "server_error", data: { status: res.status, detail: fullMsg }, timestamp: Date.now(), hypothesisId: "H3" }),
-      }).catch(() => {});
-    }
-    // #endregion
     throw new Error(fullMsg);
   }
   const text = await res.text();
@@ -101,16 +74,6 @@ export async function api<T>(
   } catch {
     throw new Error("Resposta inválida do servidor (não é JSON).");
   }
-  // #region agent log
-  if (typeof fetch !== "undefined") {
-    const hasAccessToken = typeof parsed === "object" && parsed !== null && "access_token" in parsed;
-    fetch("http://127.0.0.1:7242/ingest/bda2a585-6330-4387-9d59-18331d5ab5ec", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ location: "api.ts:ok", message: "response_ok", data: { status: res.status, hasAccessToken }, timestamp: Date.now(), hypothesisId: "H4" }),
-    }).catch(() => {});
-  }
-  // #endregion
   return parsed as T;
 }
 
