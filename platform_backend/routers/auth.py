@@ -1,13 +1,28 @@
 """
 Login e cadastro (empresa + primeiro usuário).
 """
-from fastapi import APIRouter, HTTPException, Depends
+import json
+from pathlib import Path
+
+from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel, EmailStr
 
 from ..auth import hash_password, verify_password, create_access_token, get_current_user
 from ..db import get_cursor
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+def _auth_log(message: str, data: dict, hypothesis_id: str):
+    try:
+        root = Path(__file__).resolve().parent.parent.parent
+        log_path = root / ".cursor" / "debug.log"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {"message": message, "data": data, "hypothesisId": hypothesis_id, "timestamp": __import__("time").time() * 1000}
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(payload, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
 
 
 class LoginRequest(BaseModel):
@@ -28,19 +43,9 @@ class TokenResponse(BaseModel):
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(req: LoginRequest):
+def login(req: LoginRequest, request: Request):
     # #region agent log
-    try:
-        from pathlib import Path
-        root = Path(__file__).resolve().parent.parent.parent
-        log_path = root / ".cursor" / "debug.log"
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        import json
-        payload = {"message": "auth_login_entry", "data": {"path": "/api/auth/login"}, "hypothesisId": "H2", "timestamp": __import__("time").time() * 1000}
-        with open(log_path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(payload, ensure_ascii=False) + "\n")
-    except Exception:
-        pass
+    _auth_log("auth_login_entry", {"method": request.method, "path": request.url.path, "email": req.email}, "H1,H2")
     # #endregion
     with get_cursor() as cur:
         cur.execute(
@@ -48,11 +53,20 @@ def login(req: LoginRequest):
             (req.email,),
         )
         row = cur.fetchone()
+    # #region agent log
+    _auth_log("auth_login_db", {"row_found": row is not None}, "H3")
+    # #endregion
     if not row or not verify_password(req.password, row["password_hash"]):
+        # #region agent log
+        _auth_log("auth_login_reject", {"reason": "no_row" if not row else "bad_password"}, "H3")
+        # #endregion
         raise HTTPException(status_code=401, detail="Email ou senha inválidos")
     token = create_access_token(
         data={"sub": str(row["id"]), "tenant_id": str(row["tenant_id"]) if row["tenant_id"] else None}
     )
+    # #region agent log
+    _auth_log("auth_login_ok", {"returning_token": True}, "H4")
+    # #endregion
     return TokenResponse(access_token=token)
 
 

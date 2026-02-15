@@ -22,12 +22,29 @@ from .routers import auth, tenants, agents, documents, metrics, whatsapp, telegr
 
 
 class VercelPathFixMiddleware(BaseHTTPMiddleware):
-    """Na Vercel, o path pode chegar sem o prefixo /api (ex: /auth/register). Corrige para /api/..."""
+    """Na Vercel, o path pode chegar como / ou sem /api. Corrige usando query string ou prefixo /api."""
     async def dispatch(self, request, call_next):
         path = request.scope.get("path") or ""
+        method = request.scope.get("method") or ""
+        # #region agent log
+        if "auth" in path or path == "/" or path.startswith("/api") or "index.py" in path:
+            _debug_log("middleware_request", {"path": path, "method": method}, "H2")
+        # #endregion
+        # Vercel pode passar path real no query (dest: index.py?path=/$1)
+        if (path == "/" or path == "/index.py") and method != "GET":
+            path_from_query = request.query_params.get("path")
+            if path_from_query and path_from_query.startswith("/"):
+                path = path_from_query
+                request.scope["path"] = path
+                # #region agent log
+                _debug_log("middleware_rewrite_from_query", {"new_path": path}, "H2")
+                # #endregion
         if path and not path.startswith("/api") and path != "/" and path != "/health":
             if path.startswith("/auth") or path.startswith("/webhook") or path.startswith("/tenants") or path.startswith("/agents") or path.startswith("/documents") or path.startswith("/metrics") or path.startswith("/docs"):
                 request.scope["path"] = "/api" + path
+                # #region agent log
+                _debug_log("middleware_rewrite", {"new_path": request.scope["path"]}, "H2")
+                # #endregion
         return await call_next(request)
 
 # #region agent log

@@ -27,9 +27,31 @@ export default function LoginPage() {
         return;
       }
       setToken(access_token);
+      // #region agent log
+      if (typeof fetch !== "undefined") {
+        fetch("http://127.0.0.1:7242/ingest/bda2a585-6330-4387-9d59-18331d5ab5ec", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ location: "login/page.tsx", message: "token_set", data: {}, timestamp: Date.now(), hypothesisId: "H5" }),
+        }).catch(() => {});
+      }
+      // #endregion
       router.replace("/dashboard");
     } catch (err: unknown) {
-      if (typeof window !== "undefined") console.error("[Login] Erro:", err);
+      if (typeof window !== "undefined") {
+        console.error("[Login] Erro:", err);
+        fetch("http://127.0.0.1:7242/ingest/bda2a585-6330-4387-9d59-18331d5ab5ec", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            location: "login/page.tsx:catch",
+            message: "login_error",
+            data: { msg: err instanceof Error ? err.message : String(err) },
+            timestamp: Date.now(),
+            hypothesisId: "H1,H3,H4",
+          }),
+        }).catch(() => {});
+      }
       const message = err instanceof Error ? err.message : "Erro ao entrar. Tente novamente.";
       setError(message || "Erro ao entrar. Tente novamente.");
     } finally {
