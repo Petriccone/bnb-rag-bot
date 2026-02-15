@@ -15,9 +15,21 @@ from .db_sessions import (
     update_classification,
     update_state,
 )
-from .drive_rag import search as drive_search
 from .llm_orchestrator import run as llm_run
 from .state_machine import apply_transition
+
+
+def _drive_search(user_text: str, state: str) -> str:
+    """Import lazy para não quebrar na Vercel quando google.* não está no bundle."""
+    try:
+        from .drive_rag import search as drive_search
+        return drive_search(user_text, state=state)
+    except Exception as e:
+        return (
+            "CONTEXTO: A base de conhecimento não está disponível no momento. "
+            "Não invente preços ou links; diga que vai verificar. "
+            f"(Erro: {e})"
+        )
 
 
 def run_agent_facade(
@@ -40,14 +52,7 @@ def run_agent_facade(
     if drive_folder_id_override:
         rag_context = _rag_for_folder(drive_folder_id_override, user_text, current_state)
     elif os.environ.get("DRIVE_FOLDER_ID", "").strip():
-        try:
-            rag_context = drive_search(user_text, state=current_state)
-        except Exception as e:
-            rag_context = (
-                "CONTEXTO: A base de conhecimento não está disponível no momento. "
-                "Não invente preços ou links; diga que vai verificar. "
-                f"(Erro: {e})"
-            )
+        rag_context = _drive_search(user_text, current_state)
     else:
         rag_context = (
             "CONTEXTO: A base de conhecimento (Google Drive) não está configurada. "
@@ -93,7 +98,7 @@ def _rag_for_folder(folder_id: str, query: str, state: str) -> str:
     old = os.environ.get("DRIVE_FOLDER_ID")
     try:
         os.environ["DRIVE_FOLDER_ID"] = folder_id
-        return drive_search(query, state=state)
+        return _drive_search(query, state)
     finally:
         if old is not None:
             os.environ["DRIVE_FOLDER_ID"] = old
