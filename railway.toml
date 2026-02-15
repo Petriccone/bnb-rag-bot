@@ -5,6 +5,6 @@
 builder = "nixpacks"
 
 [deploy]
-startCommand = "python run_production.py"
+startCommand = "python run_platform_backend_production.py"
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10
