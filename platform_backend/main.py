@@ -37,6 +37,7 @@ metrics = _safe_import("metrics")
 whatsapp = _safe_import("whatsapp")
 telegram = _safe_import("telegram")
 telegram_webhook = _safe_import("telegram_webhook")
+auth_extra = _safe_import("auth_extra")
 
 
 def _normalize_api_path(raw: str) -> str:
@@ -93,6 +94,8 @@ app.add_middleware(
 
 if auth:
     app.include_router(auth, prefix="/api")
+if auth_extra:
+    app.include_router(auth_extra, prefix="/api")
 if tenants:
     app.include_router(tenants, prefix="/api")
 if agents:

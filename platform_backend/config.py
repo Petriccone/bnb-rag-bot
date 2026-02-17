@@ -18,5 +18,9 @@ def get_settings():
         jwt_secret=_env("PLATFORM_JWT_SECRET", "change-me-in-production"),
         jwt_algorithm="HS256",
         jwt_expire_minutes=60,
+        refresh_token_days=int(_env("PLATFORM_REFRESH_TOKEN_DAYS", "30") or "30"),
+        verify_token_minutes=int(_env("PLATFORM_VERIFY_TOKEN_MINUTES", "60") or "60"),
+        reset_token_minutes=int(_env("PLATFORM_RESET_TOKEN_MINUTES", "30") or "30"),
+        public_base_url=_env("PLATFORM_PUBLIC_BASE_URL", ""),
         upload_dir=_env("PLATFORM_UPLOAD_DIR", ".tmp/uploads"),
     )
