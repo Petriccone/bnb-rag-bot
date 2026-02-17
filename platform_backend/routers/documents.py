@@ -30,7 +30,7 @@ def _ensure_tenant(user: dict):
 @router.get("", response_model=list[DocumentResponse])
 def list_documents(user: dict = Depends(get_current_user)):
     tenant_id = _ensure_tenant(user)
-    with get_cursor() as cur:
+    with get_cursor(tenant_id=tenant_id, user_id=user.get("user_id")) as cur:
         cur.execute(
             "SELECT id, tenant_id, file_path, embedding_namespace FROM documents WHERE tenant_id = %s ORDER BY created_at DESC",
             (tenant_id,),
@@ -64,7 +64,7 @@ async def upload_document(
         f.write(content)
     namespace = embedding_namespace or f"tenant_{tenant_id}"
     doc_id = None
-    with get_cursor() as cur:
+    with get_cursor(tenant_id=tenant_id, user_id=user.get("user_id")) as cur:
         cur.execute(
             """INSERT INTO documents (tenant_id, file_path, embedding_namespace)
                VALUES (%s, %s, %s) RETURNING id, tenant_id, file_path, embedding_namespace""",
@@ -97,7 +97,7 @@ async def upload_document(
 @router.delete("/{document_id}")
 def delete_document(document_id: str, user: dict = Depends(get_current_user)):
     tenant_id = _ensure_tenant(user)
-    with get_cursor() as cur:
+    with get_cursor(tenant_id=tenant_id, user_id=user.get("user_id")) as cur:
         cur.execute(
             "SELECT file_path FROM documents WHERE id = %s AND tenant_id = %s",
             (document_id, tenant_id),
@@ -120,6 +120,6 @@ def delete_document(document_id: str, user: dict = Depends(get_current_user)):
             os.remove(row["file_path"])
         except OSError:
             pass
-    with get_cursor() as cur:
+    with get_cursor(tenant_id=tenant_id, user_id=user.get("user_id")) as cur:
         cur.execute("DELETE FROM documents WHERE id = %s AND tenant_id = %s", (document_id, tenant_id))
     return {"ok": True}

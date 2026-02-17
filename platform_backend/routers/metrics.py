@@ -29,7 +29,7 @@ def get_metrics(user: dict = Depends(get_current_user)):
             messages_this_month=0,
             plan="free",
         )
-    with get_cursor() as cur:
+    with get_cursor(tenant_id=str(tenant_id), user_id=user.get("user_id"), role=user.get("role")) as cur:
         cur.execute("SELECT plan FROM tenants WHERE id = %s", (tenant_id,))
         t = cur.fetchone()
         plan = t["plan"] if t else "free"

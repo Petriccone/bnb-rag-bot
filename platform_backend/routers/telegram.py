@@ -25,9 +25,13 @@ class TelegramConnectRequest(BaseModel):
     bot_token: str = Field(..., validation_alias=AliasChoices("bot_token", "botToken"))
 
 
-def _ensure_telegram_table():
-    """Cria a tabela tenant_telegram_config se não existir (evita falha se o schema não foi rodado)."""
-    with get_cursor() as cur:
+def _ensure_telegram_table(tenant_id: str | None = None, user_id: str | None = None):
+    """Cria a tabela tenant_telegram_config se não existir.
+
+    Note: DDL isn't tenant-scoped, but we still pass tenant context when available
+    to keep RLS/session settings consistent.
+    """
+    with get_cursor(tenant_id=tenant_id, user_id=user_id) as cur:
         cur.execute("""
             CREATE TABLE IF NOT EXISTS tenant_telegram_config (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -39,8 +43,8 @@ def _ensure_telegram_table():
         """)
 
 
-def _get_telegram_config(tenant_id: str) -> dict | None:
-    with get_cursor() as cur:
+def _get_telegram_config(tenant_id: str, user_id: str | None = None) -> dict | None:
+    with get_cursor(tenant_id=tenant_id, user_id=user_id) as cur:
         cur.execute(
             "SELECT bot_token_encrypted FROM tenant_telegram_config WHERE tenant_id = %s",
             (tenant_id,),
@@ -145,7 +149,7 @@ def telegram_status(user: dict = Depends(get_current_user)):
     tenant_id = user.get("tenant_id")
     if not tenant_id:
         return TelegramBotInfo(connected=False)
-    cfg = _get_telegram_config(tenant_id)
+    cfg = _get_telegram_config(str(tenant_id), user_id=user.get("user_id"))
     if not cfg:
         return TelegramBotInfo(
             bot_username=os.environ.get("TELEGRAM_BOT_USERNAME", "").strip().lstrip("@") or None,
@@ -216,8 +220,8 @@ async def telegram_connect(request: Request, user: dict = Depends(get_current_us
         err_msg = _get_telegram_error_message(token)
         raise HTTPException(status_code=502, detail=err_msg)
     enc = encrypt_token(token)
-    _ensure_telegram_table()
-    with get_cursor() as cur:
+    _ensure_telegram_table(tenant_id=str(tenant_id), user_id=user.get("user_id"))
+    with get_cursor(tenant_id=str(tenant_id), user_id=user.get("user_id")) as cur:
         cur.execute(
             """INSERT INTO tenant_telegram_config (tenant_id, bot_token_encrypted, updated_at)
                VALUES (%s, %s, NOW())
@@ -257,8 +261,8 @@ async def telegram_connect_with_file(
         err_msg = _get_telegram_error_message(token)
         raise HTTPException(status_code=502, detail=err_msg)
     enc = encrypt_token(token)
-    _ensure_telegram_table()
-    with get_cursor() as cur:
+    _ensure_telegram_table(tenant_id=str(tenant_id), user_id=user.get("user_id"))
+    with get_cursor(tenant_id=str(tenant_id), user_id=user.get("user_id")) as cur:
         cur.execute(
             """INSERT INTO tenant_telegram_config (tenant_id, bot_token_encrypted, updated_at)
                VALUES (%s, %s, NOW())
@@ -275,9 +279,9 @@ def telegram_disconnect(user: dict = Depends(get_current_user)):
     tenant_id = user.get("tenant_id")
     if not tenant_id:
         raise HTTPException(status_code=403, detail="Usuário sem tenant.")
-    cfg = _get_telegram_config(tenant_id)
+    cfg = _get_telegram_config(str(tenant_id), user_id=user.get("user_id"))
     if cfg:
         _delete_telegram_webhook(cfg["bot_token"])
-    with get_cursor() as cur:
+    with get_cursor(tenant_id=str(tenant_id), user_id=user.get("user_id")) as cur:
         cur.execute("DELETE FROM tenant_telegram_config WHERE tenant_id = %s", (tenant_id,))
     return {"ok": True}
