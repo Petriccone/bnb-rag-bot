@@ -59,4 +59,8 @@ async def get_current_user(
     payload = decode_token(credentials.credentials)
     if not payload or "sub" not in payload:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido")
-    return {"user_id": payload["sub"], "tenant_id": payload.get("tenant_id")}
+    return {
+        "user_id": payload["sub"],
+        "tenant_id": payload.get("tenant_id"),
+        "role": payload.get("role"),
+    }

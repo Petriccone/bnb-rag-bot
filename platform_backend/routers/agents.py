@@ -56,7 +56,7 @@ def _ensure_tenant(user: dict):
 @router.get("", response_model=list[AgentResponse])
 def list_agents(user: dict = Depends(get_current_user)):
     tenant_id = _ensure_tenant(user)
-    with get_cursor() as cur:
+    with get_cursor(tenant_id=tenant_id, user_id=user.get("user_id")) as cur:
         cur.execute(
             "SELECT id, tenant_id, name, niche, prompt_custom, active FROM agents WHERE tenant_id = %s ORDER BY created_at",
             (tenant_id,),
@@ -83,7 +83,7 @@ def create_agent(body: AgentCreate, user: dict = Depends(get_current_user)):
             status_code=403,
             detail="Limite de agentes do plano atingido. Faça upgrade.",
         )
-    with get_cursor() as cur:
+    with get_cursor(tenant_id=tenant_id, user_id=user.get("user_id")) as cur:
         cur.execute(
             """INSERT INTO agents (tenant_id, name, niche, prompt_custom, active)
                VALUES (%s, %s, %s, %s, true) RETURNING id, tenant_id, name, niche, prompt_custom, active""",
@@ -103,7 +103,7 @@ def create_agent(body: AgentCreate, user: dict = Depends(get_current_user)):
 @router.get("/{agent_id}", response_model=AgentResponse)
 def get_agent(agent_id: UUID, user: dict = Depends(get_current_user)):
     tenant_id = _ensure_tenant(user)
-    with get_cursor() as cur:
+    with get_cursor(tenant_id=tenant_id, user_id=user.get("user_id")) as cur:
         cur.execute(
             "SELECT id, tenant_id, name, niche, prompt_custom, active FROM agents WHERE id = %s AND tenant_id = %s",
             (str(agent_id), tenant_id),
@@ -124,7 +124,7 @@ def get_agent(agent_id: UUID, user: dict = Depends(get_current_user)):
 @router.patch("/{agent_id}", response_model=AgentResponse)
 def update_agent(agent_id: UUID, body: AgentUpdate, user: dict = Depends(get_current_user)):
     tenant_id = _ensure_tenant(user)
-    with get_cursor() as cur:
+    with get_cursor(tenant_id=tenant_id, user_id=user.get("user_id")) as cur:
         cur.execute(
             "SELECT id, tenant_id, name, niche, prompt_custom, active FROM agents WHERE id = %s AND tenant_id = %s",
             (str(agent_id), tenant_id),
@@ -136,7 +136,7 @@ def update_agent(agent_id: UUID, body: AgentUpdate, user: dict = Depends(get_cur
     niche = body.niche if body.niche is not None else row["niche"]
     prompt_custom = body.prompt_custom if body.prompt_custom is not None else row["prompt_custom"]
     active = body.active if body.active is not None else row["active"]
-    with get_cursor() as cur:
+    with get_cursor(tenant_id=tenant_id, user_id=user.get("user_id")) as cur:
         cur.execute(
             """UPDATE agents SET name = %s, niche = %s, prompt_custom = %s, active = %s, updated_at = NOW()
                WHERE id = %s AND tenant_id = %s RETURNING id, tenant_id, name, niche, prompt_custom, active""",
@@ -156,7 +156,7 @@ def update_agent(agent_id: UUID, body: AgentUpdate, user: dict = Depends(get_cur
 @router.delete("/{agent_id}")
 def delete_agent(agent_id: UUID, user: dict = Depends(get_current_user)):
     tenant_id = _ensure_tenant(user)
-    with get_cursor() as cur:
+    with get_cursor(tenant_id=tenant_id, user_id=user.get("user_id")) as cur:
         cur.execute("DELETE FROM agents WHERE id = %s AND tenant_id = %s", (str(agent_id), tenant_id))
         if cur.rowcount == 0:
             raise HTTPException(status_code=404, detail="Agente não encontrado")

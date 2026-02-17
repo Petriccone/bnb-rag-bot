@@ -22,7 +22,7 @@ def get_my_tenant(user: dict = Depends(get_current_user)):
     tenant_id = user.get("tenant_id")
     if not tenant_id:
         raise HTTPException(status_code=404, detail="Usuário sem tenant")
-    with get_cursor() as cur:
+    with get_cursor(tenant_id=str(tenant_id), user_id=user.get("user_id"), role=user.get("role")) as cur:
         cur.execute(
             "SELECT id, company_name, plan, settings FROM tenants WHERE id = %s",
             (tenant_id,),
@@ -49,7 +49,7 @@ def update_tenant_settings(body: TenantSettingsUpdate, user: dict = Depends(get_
     if not tenant_id:
         raise HTTPException(status_code=404, detail="Usuário sem tenant")
     import json
-    with get_cursor() as cur:
+    with get_cursor(tenant_id=str(tenant_id), user_id=user.get("user_id"), role=user.get("role")) as cur:
         cur.execute(
             "UPDATE tenants SET settings = settings || %s::jsonb, updated_at = NOW() WHERE id = %s",
             (json.dumps(body.settings), tenant_id),
