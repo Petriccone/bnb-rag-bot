@@ -34,6 +34,7 @@ tenants = _safe_import("tenants")
 agents = _safe_import("agents")
 documents = _safe_import("documents")
 metrics = _safe_import("metrics")
+usage = _safe_import("usage")
 whatsapp = _safe_import("whatsapp")
 telegram = _safe_import("telegram")
 telegram_webhook = _safe_import("telegram_webhook")
@@ -101,6 +102,8 @@ if documents:
     app.include_router(documents, prefix="/api")
 if metrics:
     app.include_router(metrics, prefix="/api")
+if usage:
+    app.include_router(usage, prefix="/api")
 if whatsapp:
     app.include_router(whatsapp, prefix="/api")
 if telegram:

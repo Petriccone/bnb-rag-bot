@@ -161,3 +161,33 @@ def delete_agent(agent_id: UUID, user: dict = Depends(get_current_user)):
         if cur.rowcount == 0:
             raise HTTPException(status_code=404, detail="Agente não encontrado")
     return {"ok": True}
+
+
+@router.post("/{agent_id}/pause")
+def pause_agent(agent_id: UUID, user: dict = Depends(get_current_user)):
+    """Pausa um agente (define active = false)."""
+    tenant_id = _ensure_tenant(user)
+    with get_cursor() as cur:
+        cur.execute(
+            "UPDATE agents SET active = false, updated_at = NOW() WHERE id = %s AND tenant_id = %s RETURNING id",
+            (str(agent_id), tenant_id),
+        )
+        row = cur.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Agente não encontrado")
+    return {"ok": True, "status": "paused"}
+
+
+@router.post("/{agent_id}/resume")
+def resume_agent(agent_id: UUID, user: dict = Depends(get_current_user)):
+    """Ativa um agente pausado (define active = true)."""
+    tenant_id = _ensure_tenant(user)
+    with get_cursor() as cur:
+        cur.execute(
+            "UPDATE agents SET active = true, updated_at = NOW() WHERE id = %s AND tenant_id = %s RETURNING id",
+            (str(agent_id), tenant_id),
+        )
+        row = cur.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Agente não encontrado")
+    return {"ok": True, "status": "active"}

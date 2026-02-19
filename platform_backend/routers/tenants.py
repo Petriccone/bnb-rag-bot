@@ -43,6 +43,10 @@ class TenantSettingsUpdate(BaseModel):
     settings: dict = {}
 
 
+class TenantPlanUpdate(BaseModel):
+    plan: str
+
+
 @router.patch("/me")
 def update_tenant_settings(body: TenantSettingsUpdate, user: dict = Depends(get_current_user)):
     tenant_id = user.get("tenant_id")
@@ -55,3 +59,27 @@ def update_tenant_settings(body: TenantSettingsUpdate, user: dict = Depends(get_
             (json.dumps(body.settings), tenant_id),
         )
     return {"ok": True}
+
+
+@router.patch("/me/plan")
+def update_tenant_plan(body: TenantPlanUpdate, user: dict = Depends(get_current_user)):
+    """Atualiza o plano do tenant (para uso admin/billing)."""
+    tenant_id = user.get("tenant_id")
+    if not tenant_id:
+        raise HTTPException(status_code=404, detail="Usuário sem tenant")
+    
+    valid_plans = ["free", "pro", "enterprise"]
+    if body.plan not in valid_plans:
+        raise HTTPException(status_code=400, detail=f"Plano inválido. Use: {', '.join(valid_plans)}")
+    
+    with get_cursor() as cur:
+        cur.execute(
+            "UPDATE tenants SET plan = %s, updated_at = NOW() WHERE id = %s RETURNING id",
+            (body.plan, tenant_id),
+        )
+        row = cur.fetchone()
+    
+    if not row:
+        raise HTTPException(status_code=404, detail="Tenant não encontrado")
+    
+    return {"ok": True, "plan": body.plan}
