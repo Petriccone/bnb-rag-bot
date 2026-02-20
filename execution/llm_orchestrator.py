@@ -33,8 +33,10 @@ def _get_client() -> OpenAI:
     )
 
 
-def load_directives() -> str:
-    """Concatena o conteúdo de todos os .md em directives/ em ordem fixa."""
+def load_directives(skip_persona: bool = False) -> str:
+    """Concatena o conteúdo de todos os .md em directives/ em ordem fixa.
+    Se skip_persona=True, não carrega sdr_personalidade.md (evita 'filtros de água' sobrescrever agente customizado).
+    """
     order = [
         "sdr_personalidade.md",
         "spin_selling.md",
@@ -46,14 +48,20 @@ def load_directives() -> str:
     ]
     parts = []
     for name in order:
+        if skip_persona and name == "sdr_personalidade.md":
+            continue
         path = DIRECTIVES_DIR / name
         if path.exists():
             parts.append(path.read_text(encoding="utf-8"))
     return "\n\n---\n\n".join(parts)
 
 
-def build_system_prompt(current_state: str) -> str:
-    directives = load_directives()
+def build_system_prompt(
+    current_state: str,
+    agent_name: str | None = None,
+    agent_niche: str | None = None,
+    agent_prompt_custom: str | None = None,
+) -> str:
     state_instruction = (
         f"Estado atual da conversa: **{get_state_display_name(current_state)}** (valor interno: {current_state}). "
         "Siga as regras do SPIN: não pule etapas. Sua resposta (texto e tom) deve refletir SOMENTE este estado — "
@@ -61,8 +69,29 @@ def build_system_prompt(current_state: str) -> str:
         "proximo_estado: use o estado atual ou o PRÓXIMO na ordem (descoberta -> problema -> implicacao -> solucao -> oferta -> fechamento -> pos_venda). "
         "NUNCA retorne um estado anterior (ex.: se estiver em solucao, não retorne descoberta nem problema)."
     )
+    has_custom_persona = bool(
+        agent_name or agent_niche or (agent_prompt_custom and agent_prompt_custom.strip())
+    )
+    directives = load_directives(skip_persona=has_custom_persona)
+
+    if has_custom_persona:
+        persona = f"Você é {agent_name or 'o agente'}"
+        if agent_niche and agent_niche.strip():
+            persona += f", atuando como {agent_niche.strip()}"
+        persona += ". Apresente-se sempre com esse nome e nicho ao falar com o cliente. "
+        if agent_prompt_custom and agent_prompt_custom.strip():
+            persona += f"Instruções específicas: {agent_prompt_custom.strip()}. "
+        persona += (
+            "As diretivas abaixo são apenas para estilo de comunicação e método SPIN; "
+            "NÃO fale de filtros, água ou qualquer produto que não seja do seu nicho. "
+            "Siga as diretivas abaixo.\n\n"
+        )
+    else:
+        persona = (
+            "Você é um SDR de vendas de filtros de água. Siga rigorosamente as diretivas abaixo.\n\n"
+        )
     return (
-        "Você é um SDR de vendas de filtros de água. Siga rigorosamente as diretivas abaixo.\n\n"
+        persona
         + directives
         + "\n\n"
         + state_instruction
@@ -128,12 +157,21 @@ def run(
     rag_context: str,
     recent_log: list[dict],
     input_was_audio: bool = False,
+    agent_name: str | None = None,
+    agent_niche: str | None = None,
+    agent_prompt_custom: str | None = None,
 ) -> dict[str, Any]:
     """
     Executa uma rodada do orquestrador.
     Retorna dict com: resposta_texto, enviar_audio, proximo_estado, enviar_imagens, modelos.
+    Se agent_name/niche/prompt_custom forem passados, o system prompt usa a persona desse agente.
     """
-    system = build_system_prompt(current_state)
+    system = build_system_prompt(
+        current_state,
+        agent_name=agent_name,
+        agent_niche=agent_niche,
+        agent_prompt_custom=agent_prompt_custom,
+    )
     user_content = build_user_message(user_message, rag_context, recent_log)
 
     client = _get_client()

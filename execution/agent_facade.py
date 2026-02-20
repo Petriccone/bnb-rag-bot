@@ -85,6 +85,14 @@ def run_agent_facade(
 
     recent_log = get_recent_log(lead_id, limit=12, tenant_id=tenant_id, agent_id=agent_id)
 
+    agent_info = None
+    if agent_id:
+        try:
+            from .tenant_config import get_agent_by_id
+            agent_info = get_agent_by_id(agent_id)
+        except Exception:
+            pass
+
     from .llm_orchestrator import run as llm_run
     out = llm_run(
         user_id=lead_id,
@@ -93,6 +101,9 @@ def run_agent_facade(
         rag_context=rag_context,
         recent_log=recent_log,
         input_was_audio=is_audio,
+        agent_name=(agent_info or {}).get("name"),
+        agent_niche=(agent_info or {}).get("niche"),
+        agent_prompt_custom=(agent_info or {}).get("prompt_custom"),
     )
 
     resposta_texto = (out.get("resposta_texto") or "").strip()
