@@ -65,7 +65,16 @@ export default function DocumentsPage() {
         // #region agent log
         fetch('http://127.0.0.1:7242/ingest/bda2a585-6330-4387-9d59-18331d5ab5ec',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'21fe81'},body:JSON.stringify({sessionId:'21fe81',location:'documents/page.tsx:upload',message:'upload !res.ok',data:{status:res.status,statusText:res.statusText,body},hypothesisId:'D',timestamp:Date.now()})}).catch(()=>{});
         // #endregion
-        const detail = typeof body.detail === "string" ? body.detail : body.detail?.message ?? "Erro no servidor";
+        const raw = body.detail ?? body.message ?? body.error;
+        const msg =
+          typeof raw === "string"
+            ? raw
+            : Array.isArray(raw) && raw.length > 0
+              ? (raw[0].msg ?? raw[0].message ?? JSON.stringify(raw[0]))
+              : raw && typeof raw === "object" && "message" in raw
+                ? String((raw as { message?: string }).message)
+                : "";
+        const detail = (msg && String(msg).trim()) ? msg : `Erro do servidor (${res.status})`;
         throw new Error(detail);
       }
       setFile(null);

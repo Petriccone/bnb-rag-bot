@@ -41,29 +41,34 @@ def _ensure_tenant(user: dict):
 
 @router.get("", response_model=list[DocumentResponse])
 def list_documents(user: dict = Depends(get_current_user)):
-    tenant_id = _ensure_tenant(user)
-    with get_cursor() as cur:
-        cur.execute(
-            """SELECT id, tenant_id, file_path, file_name, file_size_mb, file_type, 
-                      embedding_namespace, source_url, status 
-               FROM documents WHERE tenant_id = %s ORDER BY created_at DESC""",
-            (tenant_id,),
-        )
-        rows = cur.fetchall()
-    return [
-        DocumentResponse(
-            id=str(r["id"]),
-            tenant_id=str(r["tenant_id"]),
-            file_path=r["file_path"],
-            file_name=r["file_name"],
-            file_size_mb=float(r["file_size_mb"]),
-            file_type=r["file_type"],
-            embedding_namespace=r["embedding_namespace"],
-            source_url=r.get("source_url"),
-            status=r["status"],
-        )
-        for r in rows
-    ]
+    try:
+        tenant_id = _ensure_tenant(user)
+        with get_cursor() as cur:
+            cur.execute(
+                """SELECT id, tenant_id, file_path, file_name, file_size_mb, file_type, 
+                          embedding_namespace, source_url, status 
+                   FROM documents WHERE tenant_id = %s ORDER BY created_at DESC""",
+                (tenant_id,),
+            )
+            rows = cur.fetchall()
+        return [
+            DocumentResponse(
+                id=str(r["id"]),
+                tenant_id=str(r["tenant_id"]),
+                file_path=r["file_path"] or "",
+                file_name=(r.get("file_name") or r.get("file_path") or "unknown"),
+                file_size_mb=float(r.get("file_size_mb") or 0),
+                file_type=(r.get("file_type") or "unknown"),
+                embedding_namespace=r.get("embedding_namespace") or "",
+                source_url=r.get("source_url"),
+                status=(r.get("status") or "pending"),
+            )
+            for r in rows
+        ]
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/upload", response_model=DocumentResponse)

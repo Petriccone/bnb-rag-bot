@@ -18,5 +18,5 @@ def get_settings():
         jwt_secret=_env("PLATFORM_JWT_SECRET", "change-me-in-production"),
         jwt_algorithm="HS256",
         jwt_expire_minutes=60,
-        upload_dir=_env("PLATFORM_UPLOAD_DIR", ".tmp/uploads"),
+        upload_dir=_env("PLATFORM_UPLOAD_DIR") or ("/tmp/uploads" if os.environ.get("VERCEL") else ".tmp/uploads"),
     )
