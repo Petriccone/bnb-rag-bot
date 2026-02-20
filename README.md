@@ -1,89 +1,465 @@
-# B&B RAG Bot - Agente de Vendas para Telegram
+# B&B RAG Platform API - Backend Multi-tenant
 
-Este é um bot consultivo de vendas para Telegram, pronto para ser adaptado para qualquer produto ou serviço. Ele vem equipado com uma estrutura de IA de ponta para guiar usuários desde o primeiro contato até o pós-venda.
+API REST para plataforma SaaS B2B de automação de WhatsApp/Telegram com RAG (Retrieval Augmented Generation).
 
-✨ **[Veja o vídeo de demonstração!](https://youtube.com)** 
+## Índice
 
-## 🚀 Rode em 5 Minutos (Modo Básico)
+- [Arquitetura Multi-tenant](#arquitetura-multi-tenant)
+- [Autenticação](#autenticação)
+- [API Reference](#api-reference)
+  - [Auth](#auth)
+  - [Tenants](#tenants)
+  - [Agents](#agents)
+  - [Documents](#documents)
+  - [Usage Tracking](#usage-tracking)
+  - [Metrics](#metrics)
+- [Vector Store](#vector-store)
+- [Deployment](#deployment)
 
-Siga estes passos para ter a versão de texto do bot funcionando localmente.
+## Arquitetura Multi-tenant
 
-1.  **Clone o repositório:**
-    ```bash
-    git clone https://github.com/Petriccone/bnb-rag-bot.git
-    cd bnb-rag-bot
-    ```
+### Isolamento de Dados
 
-2.  **Instale as dependências:**
-    ```bash
-    # Recomendado: crie um ambiente virtual primeiro
-    # python -m venv venv && source venv/bin/activate
-    pip install -r requirements.txt
-    ```
+- Cada tenant possui dados completamente isolados
+- `tenant_id` é usado em todas as consultas SQL
+- Vector store por tenant (namespace separado)
+- Cache de embeddings isolado
 
-3.  **Configure o ambiente:**
-    Copie o arquivo de exemplo e preencha SÓ as duas primeiras variáveis.
-    ```bash
-    cp .env.example .env
-    ```
-    Edite o `.env`:
-    - `TELEGRAM_BOT_TOKEN`: Obtenha com o [@BotFather](https://t.me/BotFather) no Telegram.
-    - `OPENROUTER_API_KEY`: Obtenha em [openrouter.ai](https://openrouter.ai).
+### Middleware de Contexto
 
-4.  **Rode o bot:**
-    ```bash
-    python run_bot.py
-    ```
+O `TenantContextMiddleware` injeta automaticamente:
+- `tenant_id` no request.state
+- `user_id` do token JWT
+- `plan` do tenant
 
-Pronto! Abra uma conversa com seu bot no Telegram e envie `/start` para começar.
+```python
+from platform_backend.middleware import get_tenant_from_request
+
+async def minha_rota(request: Request):
+    tenant_id = get_tenant_from_request(request)
+```
+
+## Autenticação
+
+### JWT Tokens
+
+A API usa JWT para autenticação. O token deve ser enviado no header:
+
+```
+Authorization: Bearer <token_jwt>
+```
+
+### Criação de Token
+
+```python
+from platform_backend.auth import create_access_token
+
+token = create_access_token({
+    "sub": "user_id",
+    "tenant_id": "tenant_uuid",
+    "plan": "pro",
+    "email": "user@example.com"
+})
+```
+
+### Dependencies
+
+Use as dependências do FastAPI para proteger rotas:
+
+```python
+from platform_backend.dependencies import CurrentUser, CurrentTenant
+
+@router.get("/items")
+def list_items(user: CurrentUser, tenant_id: CurrentTenant):
+    # user = {"user_id": "...", "tenant_id": "...", "plan": "..."}
+    ...
+```
+
+## API Reference
+
+### Auth
+
+#### POST /api/auth/register
+
+Registra novo usuário e tenant.
+
+**Request:**
+```json
+{
+  "email": "user@example.com",
+  "password": "securepassword",
+  "company_name": "My Company"
+}
+```
+
+**Response:**
+```json
+{
+  "id": "user_uuid",
+  "email": "user@example.com",
+  "tenant_id": "tenant_uuid",
+  "access_token": "jwt_token",
+  "token_type": "bearer"
+}
+```
+
+#### POST /api/auth/login
+
+Login com email e senha.
+
+**Request:**
+```json
+{
+  "email": "user@example.com",
+  "password": "securepassword"
+}
+```
+
+**Response:**
+```json
+{
+  "access_token": "jwt_token",
+  "token_type": "bearer"
+}
+```
 
 ---
 
-## ✨ Funcionalidades
+### Tenants
 
-*   **🧠 Metodologia SPIN Selling**: Guia a conversa através dos estágios de **S**ituação, **P**roblema, **I**mplicação e **N**ecessidade de solução.
-*   **🗣️ Suporte a Áudio**: Transcreve mensagens de voz do usuário (STT) e responde com áudio (TTS).
-*   **📚 Base de Conhecimento com RAG**: Conecta-se a uma pasta no Google Drive para responder perguntas com base nos seus documentos (PDFs, Docs, etc).
-*   **🗂️ Gestão de Estado**: Mantém o contexto da conversa, sabendo em que ponto da jornada de compra o usuário está.
-*   **🖼️ Envio de Mídia**: Pode enviar imagens de produtos durante a fase de oferta.
-*   **☁️ Pronto para Deploy**: Otimizado para rodar 24/7 em plataformas como Railway, Render e Fly.io.
+#### GET /api/tenants
 
-## ⚙️ Configuração Avançada
+Lista informações do tenant atual.
 
-Quer usar todo o poder do bot? Configure os módulos opcionais no seu arquivo `.env`.
+**Response:**
+```json
+{
+  "id": "tenant_uuid",
+  "company_name": "My Company",
+  "plan": "pro",
+  "settings": {},
+  "created_at": "2024-01-01T00:00:00Z"
+}
+```
 
-*   **Para usar RAG (Google Drive):**
-    - Siga o guia para criar suas credenciais no Google Cloud.
-    - Adicione a `DRIVE_FOLDER_ID` da sua pasta de materiais no `.env`.
+#### PATCH /api/tenants
 
-*   **Para usar Áudio (STT/TTS):**
-    - Adicione sua `OPENAI_API_KEY` no `.env`.
+Atualiza configurações do tenant.
 
-*   **Para usar um Banco de Dados Persistente (Supabase):**
-    - Adicione `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` no `.env`.
-    - Execute o script `execution/supabase_schema.sql` no seu projeto Supabase.
-    - Se não configurar, o bot usará um arquivo SQLite local (`.tmp/sdr_bot.db`).
+**Request:**
+```json
+{
+  "plan": "enterprise",
+  "settings": {"key": "value"}
+}
+```
 
-*   **Para usar Buffer de Mensagens (Debounce):**
-    - Adicione sua `REDIS_URL` no `.env` para agrupar múltiplas mensagens de texto em uma única resposta, economizando chamadas de API.
+---
 
-A documentação detalhada para cada uma dessas configurações está na seção **Guias de Deploy e Configuração**.
+### Agents
 
-## 🤝 Contribuição e Comunidade
+#### GET /api/agents
 
-Este é um projeto de código aberto e adoramos receber ajuda! 
+Lista todos os agentes do tenant.
 
-*   📜 **Código de Conduta**: Seja respeitoso e construtivo. Leia nosso [Código de Conduta](CODE_OF_CONDUCT.md).
-*   🛠️ **Guia de Contribuição**: Quer reportar um bug ou adicionar uma funcionalidade? Veja como em nosso [Guia de Contribuição](CONTRIBUTING.md).
+**Response:**
+```json
+[
+  {
+    "id": "agent_uuid",
+    "tenant_id": "tenant_uuid",
+    "name": "Sales Agent",
+    "niche": "real_estate",
+    "prompt_custom": "You are a...",
+    "active": true
+  }
+]
+```
 
-## 📚 Guias de Deploy e Configuração
+#### POST /api/agents
 
-*   **[DEPLOY.md](DEPLOY.md)**: Guia completo para colocar seu bot em produção (Railway, Render, Fly.io, etc).
-*   **[TELEGRAM_COMO_RODAR.md](TELEGRAM_COMO_RODAR.md)**: Passos detalhados sobre o Telegram.
-*   **Diretivas**: Altere o comportamento do agente (personalidade, fluxo, etc) editando os arquivos na pasta `directives/`.
+Cria novo agente.
 
-## 🏗️ Arquitetura Resumida
+**Request:**
+```json
+{
+  "name": "Sales Agent",
+  "niche": "real_estate",
+  "prompt_custom": "You are a helpful agent..."
+}
+```
 
-- **Camada 1 — Diretivas**: SOPs em `directives/` (personalidade, SPIN, RAG, etc).
-- **Camada 2 — Orquestração**: Lógica principal que aplica estados e chama os serviços.
-- **Camada 3 — Execução**: Scripts em `execution/` (Telegram, STT, TTS, RAG, etc).
+#### GET /api/agents/{agent_id}
+
+Obtém agente específico.
+
+#### PATCH /api/agents/{agent_id}
+
+Atualiza agente (pausar/ativar).
+
+**Request:**
+```json
+{
+  "name": "New Name",
+  "active": false
+}
+```
+
+#### DELETE /api/agents/{agent_id}
+
+Deleta agente.
+
+---
+
+### Documents
+
+#### GET /api/documents
+
+Lista documentos do tenant.
+
+**Response:**
+```json
+[
+  {
+    "id": "doc_uuid",
+    "tenant_id": "tenant_uuid",
+    "file_path": "/uploads/xxx.pdf",
+    "file_name": "product_list.pdf",
+    "file_size_mb": 2.5,
+    "file_type": "pdf",
+    "embedding_namespace": "tenant_uuid",
+    "source_url": null,
+    "status": "completed"
+  }
+]
+```
+
+#### POST /api/documents/upload
+
+Faz upload de documento.
+
+- **Form-data**: `file` (UploadFile)
+- **Query**: `embedding_namespace` (opcional)
+
+**Formatos suportados:**
+- `.txt`, `.pdf`
+- `.xlsx`, `.xls` (Excel)
+- `.docx` (Word)
+- `.csv`
+- `.md` (Markdown)
+- `.html`
+
+**Response:**
+```json
+{
+  "id": "doc_uuid",
+  "status": "pending",
+  ...
+}
+```
+
+O processamento é assíncrono. Use `/api/documents/{id}/status` para verificar.
+
+#### POST /api/documents/url
+
+Faz upload de documento a partir de URL.
+
+**Request:**
+```json
+{
+  "url": "https://example.com/page.html",
+  "embedding_namespace": "optional_namespace"
+}
+```
+
+#### GET /api/documents/{document_id}/status
+
+Verifica status do processamento.
+
+**Response:**
+```json
+{
+  "id": "doc_uuid",
+  "status": "completed",
+  "file_name": "document.pdf",
+  "file_type": "pdf"
+}
+```
+
+#### DELETE /api/documents/{document_id}
+
+Deleta documento e seus chunks.
+
+---
+
+### Usage Tracking
+
+#### GET /api/usage
+
+Retorna uso atual do tenant no mês.
+
+**Response:**
+```json
+{
+  "year_month": "2024-01",
+  "messages_used": 1500,
+  "messages_limit": 2000,
+  "tokens_used": 50000,
+  "tokens_limit": 100000,
+  "storage_mb": 25.5,
+  "storage_limit_mb": 50,
+  "documents_count": 8,
+  "documents_limit": 10,
+  "agents_count": 3,
+  "agents_limit": 3,
+  "plan": "free"
+}
+```
+
+#### POST /api/usage/track/message
+
+Registra mensagem enviada (uso interno).
+
+#### POST /api/usage/track/tokens
+
+Registra tokens usados (uso interno).
+
+#### POST /api/usage/track/storage
+
+Registra uso de storage.
+
+#### GET /api/usage/logs
+
+Retorna logs de uso.
+
+**Query params:**
+- `limit`: número de registros (default 50)
+- `event_type`: filtrar por tipo
+
+#### GET /api/usage/limits?plan=pro
+
+Retorna limites de um plano.
+
+**Response:**
+```json
+{
+  "plan": "pro",
+  "messages_limit": 10000,
+  "tokens_limit": 500000,
+  "storage_limit_mb": 500,
+  "documents_limit": 50,
+  "agents_limit": 10
+}
+```
+
+---
+
+### Metrics
+
+#### GET /api/metrics
+
+Retorna métricas agregadas do tenant.
+
+**Response:**
+```json
+{
+  "agents_count": 3,
+  "conversations_count": 150,
+  "leads_count": 45,
+  "messages_this_month": 1200,
+  "plan": "pro"
+}
+```
+
+---
+
+## Vector Store
+
+### Configuração
+
+O sistema usa PostgreSQL com extensão pgvector para armazenar embeddings.
+
+### Namespace por Tenant
+
+Cada tenant tem seu namespace de embeddings:
+- Default: `tenant_{tenant_id}`
+- Custom: especificado no upload
+
+### Busca RAG
+
+```python
+from execution.knowledge_rag import search_document_chunks
+
+context = search_document_chunks(
+    tenant_id="tenant_uuid",
+    query="qual o preço do produto X?",
+    limit=6
+)
+```
+
+### Índices
+
+O schema inclui índices HNSW para busca por similaridade (cosine distance):
+
+```sql
+CREATE INDEX idx_document_chunks_embedding 
+ON document_chunks USING hnsw (embedding vector_cosine_ops);
+```
+
+## Deployment
+
+### Variáveis de Ambiente
+
+```env
+# Banco de dados
+DATABASE_URL=postgresql://...
+PLATFORM_DATABASE_URL=postgresql://...
+
+# JWT
+PLATFORM_JWT_SECRET=sua_chave_secreta
+
+# OpenAI (para embeddings)
+OPENAI_API_KEY=sk-...
+
+# Upload
+PLATFORM_UPLOAD_DIR=.tmp/uploads
+
+# Vercel
+VERCEL=1
+```
+
+### Execute Migration
+
+```bash
+# Schema base
+psql $DATABASE_URL -f database/schema.sql
+
+# Schema pgvector
+psql $DATABASE_URL -f database/schema_pgvector.sql
+
+# Schema usage tracking
+psql $DATABASE_URL -f database/schema_usage.sql
+
+# Migration (se necessário)
+psql $DATABASE_URL -f database/migration_documents.sql
+```
+
+### Run Server
+
+```bash
+# Development
+python run_platform_backend.py
+
+# Production
+python run_platform_backend_production.py
+```
+
+## Planos
+
+| Recurso | Free | Pro | Enterprise |
+|---------|------|-----|------------|
+| Mensagens/mês | 2,000 | 10,000 | Ilimitado |
+| Tokens/mês | 100K | 500K | Ilimitado |
+| Storage | 50MB | 500MB | Ilimitado |
+| Agentes | 3 | 10 | Ilimitado |
+| Documentos | 10 | 50 | Ilimitado |

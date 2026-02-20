@@ -73,11 +73,18 @@ CREATE TABLE IF NOT EXISTS documents (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     file_path TEXT NOT NULL,
+    file_name TEXT NOT NULL,
+    file_size_mb REAL NOT NULL DEFAULT 0,
+    file_type TEXT NOT NULL,
     embedding_namespace TEXT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    source_url TEXT,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_documents_tenant ON documents (tenant_id);
+CREATE INDEX IF NOT EXISTS idx_documents_status ON documents (status);
 CREATE INDEX IF NOT EXISTS idx_documents_namespace ON documents (tenant_id, embedding_namespace);
 
 -- Usuários da plataforma (login JWT). Um usuário pertence a um tenant.
