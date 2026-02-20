@@ -62,24 +62,40 @@ def _extract_text_from_pdf(path: Path) -> str:
 
 
 def _extract_text_from_excel(path: Path) -> str:
-    """Extrai texto de Excel (.xlsx, .xls)."""
+    """Extrai texto de Excel (.xlsx com openpyxl, .xls com xlrd)."""
+    suf = path.suffix.lower()
+    if suf == ".xls":
+        return _extract_text_from_xls(path)
     try:
         import openpyxl
     except ImportError:
-        raise RuntimeError("Para Excel instale: pip install openpyxl")
-    
+        raise RuntimeError("Para Excel .xlsx instale: pip install openpyxl")
     parts = []
     wb = openpyxl.load_workbook(path, data_only=True)
-    
     for sheet_name in wb.sheetnames:
         sheet = wb[sheet_name]
         parts.append(f"\n--- Sheet: {sheet_name} ---\n")
-        
         for row in sheet.iter_rows(values_only=True):
             row_text = " | ".join(str(cell) if cell is not None else "" for cell in row)
             if row_text.strip():
                 parts.append(row_text)
-    
+    return "\n".join(parts).strip()
+
+
+def _extract_text_from_xls(path: Path) -> str:
+    """Extrai texto de Excel antigo (.xls)."""
+    try:
+        import xlrd
+    except ImportError:
+        raise RuntimeError("Para Excel .xls instale: pip install xlrd")
+    wb = xlrd.open_workbook(str(path))
+    parts = []
+    for sheet in wb.sheets():
+        parts.append(f"\n--- Sheet: {sheet.name} ---\n")
+        for row_idx in range(sheet.nrows):
+            row_text = " | ".join(str(sheet.cell_value(row_idx, col_idx)).strip() for col_idx in range(sheet.ncols))
+            if row_text.strip():
+                parts.append(row_text)
     return "\n".join(parts).strip()
 
 

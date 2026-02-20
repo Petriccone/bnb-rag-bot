@@ -135,10 +135,10 @@ export default function WhatsAppPage() {
   }
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-slate-800 mb-6">Conexão WhatsApp</h1>
+    <div className="space-y-4 sm:space-y-6">
+      <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Conexão WhatsApp</h1>
 
-      <div className="max-w-xl rounded-lg border border-slate-200 bg-white p-6 mb-6">
+      <div className="max-w-xl rounded-lg border border-slate-200 bg-white p-4 sm:p-6">
         {status ? (
           <>
             <p className="text-slate-600 mb-2">{status.message}</p>
@@ -160,7 +160,7 @@ export default function WhatsAppPage() {
                   type="button"
                   onClick={handleDisconnect}
                   disabled={disconnecting}
-                  className="mt-4 rounded-lg border border-red-200 text-red-700 px-4 py-2 hover:bg-red-50 disabled:opacity-50"
+                  className="mt-4 rounded-lg border border-red-200 text-red-700 px-4 py-3 min-h-[44px] hover:bg-red-50 disabled:opacity-50"
                 >
                   {disconnecting ? "Desconectando..." : "Desconectar"}
                 </button>
@@ -170,7 +170,7 @@ export default function WhatsAppPage() {
                     <select
                       value={whatsappAgentId ?? ""}
                       onChange={(e) => handleSetWhatsAppAgent(e.target.value)}
-                      className="w-full max-w-xs rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white"
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2.5 min-h-[44px] text-sm bg-white"
                     >
                       <option value="">Primeiro agente ativo</option>
                       {agents.map((a) => (
@@ -194,7 +194,7 @@ export default function WhatsAppPage() {
         <div className="space-y-6 max-w-xl">
           {/* Opção simples: só escanear QR (quando admin configurou Evolution) */}
           {evolutionAvailable && (
-            <div className="rounded-lg border border-green-200 bg-green-50/50 p-6">
+            <div className="rounded-lg border border-green-200 bg-green-50/50 p-4 sm:p-6">
               <h2 className="font-semibold text-slate-800 mb-1">Conectar em 2 passos</h2>
               <p className="text-sm text-slate-600 mb-4">
                 Clique no botão abaixo e escaneie o QR Code com o WhatsApp do celular (WhatsApp → Aparelhos conectados → Conectar aparelho). Nada para instalar.
@@ -204,7 +204,7 @@ export default function WhatsAppPage() {
                 type="button"
                 onClick={handleRequestQr}
                 disabled={loadingQr}
-                className="rounded-lg bg-green-600 text-white px-4 py-2 hover:bg-green-700 disabled:opacity-50"
+                className="rounded-lg bg-green-600 text-white px-4 py-3 min-h-[44px] hover:bg-green-700 disabled:opacity-50"
               >
                 {loadingQr ? "Gerando QR..." : "Mostrar QR Code"}
               </button>
@@ -214,7 +214,7 @@ export default function WhatsAppPage() {
                     <img
                       src={typeof qr.qr_code_base64 === "string" && qr.qr_code_base64.startsWith("data:") ? qr.qr_code_base64 : `data:image/png;base64,${qr.qr_code_base64}`}
                       alt="QR Code WhatsApp"
-                      className="border border-slate-200 rounded-lg max-w-[240px]"
+                      className="border border-slate-200 rounded-lg max-w-[240px] w-full"
                     />
                   ) : qr.pairing_code ? (
                     <p className="text-slate-700">Código de pareamento: <strong>{qr.pairing_code}</strong></p>
@@ -226,7 +226,7 @@ export default function WhatsAppPage() {
           )}
 
           {/* Cloud API (Meta) - sempre visível */}
-          <div className="rounded-lg border border-slate-200 bg-white p-6">
+          <div className="rounded-lg border border-slate-200 bg-white p-4 sm:p-6">
             <h2 className="font-semibold text-slate-800 mb-1">Ou: WhatsApp Cloud API (Meta)</h2>
             <p className="text-sm text-slate-600 mb-4">
               Se você tem conta Meta for Developers, use Phone Number ID e Access Token.
@@ -239,7 +239,7 @@ export default function WhatsAppPage() {
                   value={phoneNumberId}
                   onChange={(e) => setPhoneNumberId(e.target.value)}
                   placeholder="Ex.: 123456789012345"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 min-h-[44px]"
                 />
               </div>
               <div>
@@ -249,14 +249,14 @@ export default function WhatsAppPage() {
                   value={accessToken}
                   onChange={(e) => setAccessToken(e.target.value)}
                   placeholder="Token do Meta"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 min-h-[44px]"
                 />
               </div>
               {error && !evolutionAvailable && <p className="text-red-600 text-sm">{error}</p>}
               <button
                 type="submit"
                 disabled={connecting}
-                className="rounded-lg border border-slate-300 px-4 py-2 hover:bg-slate-50 disabled:opacity-50"
+                className="rounded-lg border border-slate-300 px-4 py-3 min-h-[44px] w-full sm:w-auto hover:bg-slate-50 disabled:opacity-50"
               >
                 {connecting ? "Conectando..." : "Conectar com Cloud API"}
               </button>
@@ -265,7 +265,7 @@ export default function WhatsAppPage() {
 
           {/* Evolution manual (só se não tiver QR disponível) - para quem tem própria Evolution */}
           {!evolutionAvailable && (
-            <div className="rounded-lg border border-slate-200 bg-white p-6">
+            <div className="rounded-lg border border-slate-200 bg-white p-4 sm:p-6">
               <h2 className="font-semibold text-slate-800 mb-1">Ou: Evolution API (URL própria)</h2>
               <p className="text-sm text-slate-600 mb-4">
                 Se você já tem uma Evolution API (sua ou de um provedor), informe a URL, API Key e nome da instância.
@@ -278,7 +278,7 @@ export default function WhatsAppPage() {
                     value={evoBaseUrl}
                     onChange={(e) => setEvoBaseUrl(e.target.value)}
                     placeholder="https://sua-evolution.com"
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2.5 min-h-[44px]"
                   />
                 </div>
                 <div>
@@ -287,7 +287,7 @@ export default function WhatsAppPage() {
                     type="password"
                     value={evoApiKey}
                     onChange={(e) => setEvoApiKey(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2.5 min-h-[44px]"
                   />
                 </div>
                 <div>
@@ -297,13 +297,13 @@ export default function WhatsAppPage() {
                     value={evoInstance}
                     onChange={(e) => setEvoInstance(e.target.value)}
                     placeholder="Ex.: minha-instancia"
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2.5 min-h-[44px]"
                   />
                 </div>
                 <button
                   type="submit"
                   disabled={connectingEvo}
-                  className="rounded-lg border border-slate-300 px-4 py-2 hover:bg-slate-50 disabled:opacity-50"
+                  className="rounded-lg border border-slate-300 px-4 py-3 min-h-[44px] w-full sm:w-auto hover:bg-slate-50 disabled:opacity-50"
                 >
                   {connectingEvo ? "Conectando..." : "Conectar"}
                 </button>

@@ -49,12 +49,12 @@ export default function EditAgentPage() {
   if (error && !name) return <p className="text-red-600">{error}</p>;
 
   return (
-    <div>
-      <div className="mb-6 flex items-center gap-4">
-        <Link href="/dashboard/agents" className="text-slate-500 hover:text-slate-700">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+        <Link href="/dashboard/agents" className="text-slate-500 hover:text-slate-700 min-h-[44px] flex items-center self-start">
           ← Voltar
         </Link>
-        <h1 className="text-2xl font-bold text-slate-800">Editar agente</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Editar agente</h1>
       </div>
       <form onSubmit={handleSubmit} className="max-w-xl space-y-4">
         <div>
@@ -63,7 +63,7 @@ export default function EditAgentPage() {
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2"
+            className="w-full rounded-lg border border-slate-300 px-3 py-2.5 min-h-[44px]"
             required
           />
         </div>
@@ -73,7 +73,7 @@ export default function EditAgentPage() {
             type="text"
             value={niche}
             onChange={(e) => setNiche(e.target.value)}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2"
+            className="w-full rounded-lg border border-slate-300 px-3 py-2.5 min-h-[44px]"
           />
         </div>
         <div>
@@ -84,13 +84,13 @@ export default function EditAgentPage() {
             className="w-full rounded-lg border border-slate-300 px-3 py-2 min-h-[100px]"
           />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3 min-h-[44px]">
           <input
             type="checkbox"
             id="active"
             checked={active}
             onChange={(e) => setActive(e.target.checked)}
-            className="rounded border-slate-300"
+            className="rounded border-slate-300 w-5 h-5"
           />
           <label htmlFor="active" className="text-sm text-slate-700">Agente ativo</label>
         </div>
@@ -98,7 +98,7 @@ export default function EditAgentPage() {
         <button
           type="submit"
           disabled={loading}
-          className="rounded-lg bg-blue-600 text-white px-4 py-2 hover:bg-blue-700 disabled:opacity-50"
+          className="rounded-lg bg-blue-600 text-white px-4 py-3 min-h-[44px] hover:bg-blue-700 disabled:opacity-50 font-medium"
         >
           {loading ? "Salvando..." : "Salvar"}
         </button>

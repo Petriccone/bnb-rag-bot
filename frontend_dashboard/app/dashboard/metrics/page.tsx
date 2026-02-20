@@ -21,26 +21,26 @@ export default function MetricsPage() {
   if (!m) return <p className="text-slate-500">Carregando métricas...</p>;
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-slate-800 mb-6">Métricas</h1>
+    <div className="space-y-4 sm:space-y-6">
+      <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Métricas</h1>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-6 rounded-lg bg-white border border-slate-200">
+        <div className="p-4 sm:p-6 rounded-lg bg-white border border-slate-200">
           <p className="text-sm text-slate-500">Plano</p>
           <p className="text-xl font-semibold text-slate-800 capitalize">{m.plan}</p>
         </div>
-        <div className="p-6 rounded-lg bg-white border border-slate-200">
+        <div className="p-4 sm:p-6 rounded-lg bg-white border border-slate-200">
           <p className="text-sm text-slate-500">Agentes</p>
           <p className="text-xl font-semibold text-slate-800">{m.agents_count}</p>
         </div>
-        <div className="p-6 rounded-lg bg-white border border-slate-200">
+        <div className="p-4 sm:p-6 rounded-lg bg-white border border-slate-200">
           <p className="text-sm text-slate-500">Conversas</p>
           <p className="text-xl font-semibold text-slate-800">{m.conversations_count}</p>
         </div>
-        <div className="p-6 rounded-lg bg-white border border-slate-200">
+        <div className="p-4 sm:p-6 rounded-lg bg-white border border-slate-200">
           <p className="text-sm text-slate-500">Leads</p>
           <p className="text-xl font-semibold text-slate-800">{m.leads_count}</p>
         </div>
-        <div className="p-6 rounded-lg bg-white border border-slate-200 sm:col-span-2">
+        <div className="p-4 sm:p-6 rounded-lg bg-white border border-slate-200 sm:col-span-2">
           <p className="text-sm text-slate-500">Mensagens neste mês</p>
           <p className="text-xl font-semibold text-slate-800">{m.messages_this_month}</p>
         </div>

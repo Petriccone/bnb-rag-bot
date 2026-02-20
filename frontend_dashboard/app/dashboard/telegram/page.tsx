@@ -163,12 +163,12 @@ export default function TelegramPage() {
   const hasActiveAgent = agents.some((a) => a.active);
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-slate-800 mb-6">Conexão Telegram</h1>
+    <div className="space-y-4 sm:space-y-6">
+      <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Conexão Telegram</h1>
 
       <div className="max-w-xl space-y-6">
         {agents.length === 0 && (
-          <div className="rounded-lg border-2 border-amber-200 bg-amber-50 p-6">
+          <div className="rounded-lg border-2 border-amber-200 bg-amber-50 p-4 sm:p-6">
             <h2 className="font-semibold text-amber-900 mb-2">Antes de conectar o Telegram</h2>
             <p className="text-amber-800 text-sm mb-3">
               O bot do Telegram usa um <strong>agente</strong> que você cria e treina no dashboard. Siga os passos:
@@ -188,7 +188,7 @@ export default function TelegramPage() {
             </ol>
             <Link
               href="/dashboard/agents/new"
-              className="inline-block rounded-lg bg-amber-600 text-white px-4 py-2 text-sm font-medium hover:bg-amber-700"
+              className="inline-block rounded-lg bg-amber-600 text-white px-4 py-3 min-h-[44px] text-sm font-medium hover:bg-amber-700 flex items-center justify-center"
             >
               Criar meu primeiro agente
             </Link>
@@ -202,7 +202,7 @@ export default function TelegramPage() {
           </div>
         )}
 
-        <div className="rounded-lg border border-slate-200 bg-white p-6">
+        <div className="rounded-lg border border-slate-200 bg-white p-4 sm:p-6">
           <h2 className="font-semibold text-slate-800 mb-2">Webhook (opcional)</h2>
           <p className="text-slate-600 text-sm mb-3">
             Use esta seção para o bot receber mensagens via URL pública (servidor, Vercel). Conecte com o token do servidor ou cole o token abaixo.
@@ -217,7 +217,7 @@ export default function TelegramPage() {
                   type="button"
                   onClick={handleDisconnect}
                   disabled={loading}
-                  className="px-4 py-2 rounded-lg border border-red-200 text-red-700 hover:bg-red-50 disabled:opacity-50"
+                  className="px-4 py-3 min-h-[44px] rounded-lg border border-red-200 text-red-700 hover:bg-red-50 disabled:opacity-50"
                 >
                   Desconectar
                 </button>
@@ -228,7 +228,7 @@ export default function TelegramPage() {
                   <select
                     value={telegramAgentId ?? ""}
                     onChange={(e) => handleSetTelegramAgent(e.target.value)}
-                    className="w-full max-w-xs rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2.5 min-h-[44px] text-sm bg-white"
                   >
                     <option value="">Primeiro agente ativo</option>
                     {agents.map((a) => (
@@ -247,12 +247,12 @@ export default function TelegramPage() {
                 <p className="text-slate-600 text-sm mb-2">
                   Se o token está no <code className="bg-slate-100 px-1 rounded">.env</code> do servidor (<code className="bg-slate-100 px-1 rounded">TELEGRAM_BOT_TOKEN</code>):
                 </p>
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-col sm:flex-row flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={handleCheckServerToken}
                     disabled={loading}
-                    className="px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-700 text-sm hover:bg-slate-50"
+                    className="px-3 py-2.5 min-h-[44px] rounded-lg border border-slate-300 bg-white text-slate-700 text-sm hover:bg-slate-50"
                   >
                     Testar token do servidor
                   </button>
@@ -260,7 +260,7 @@ export default function TelegramPage() {
                     type="button"
                     onClick={handleConnectWithServerToken}
                     disabled={loading}
-                    className="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 font-medium"
+                    className="px-4 py-3 min-h-[44px] rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 font-medium"
                   >
                     {loading ? "Conectando…" : "Conectar com token do servidor"}
                   </button>
@@ -282,7 +282,7 @@ export default function TelegramPage() {
               </div>
               <div className="border-t border-slate-200 pt-3">
                 <p className="text-slate-600 text-sm mb-2">Ou envie um arquivo .txt com apenas o token (evita colar):</p>
-                <label className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-300 bg-white text-sm cursor-pointer hover:bg-slate-50">
+                <label className="inline-flex items-center gap-2 px-3 py-2.5 min-h-[44px] rounded-lg border border-slate-300 bg-white text-sm cursor-pointer hover:bg-slate-50">
                   <input type="file" accept=".txt,text/plain" onChange={handleFileSelect} disabled={loading} className="sr-only" />
                   <span>Selecionar arquivo .txt</span>
                 </label>
@@ -296,7 +296,7 @@ export default function TelegramPage() {
                   value={token}
                   onChange={(e) => setToken(e.target.value)}
                   placeholder="Ex: 7810006820:AAH..."
-                  className="w-full rounded-lg border border-slate-300 pl-3 pr-10 py-2 text-sm font-mono"
+                  className="w-full rounded-lg border border-slate-300 pl-3 pr-10 py-2.5 min-h-[44px] text-sm font-mono"
                   autoComplete="off"
                   spellCheck={false}
                 />
@@ -324,7 +324,7 @@ export default function TelegramPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
+                className="px-4 py-3 min-h-[44px] rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 w-full sm:w-auto"
               >
                 {loading ? "Conectando…" : "Conectar"}
               </button>
@@ -351,7 +351,7 @@ export default function TelegramPage() {
 
         {/* Link do tenant */}
         {tenantId && (
-          <div className="rounded-lg border border-slate-200 bg-white p-6">
+          <div className="rounded-lg border border-slate-200 bg-white p-4 sm:p-6">
             <h2 className="font-semibold text-slate-800 mb-2">Link do seu bot (compartilhe com clientes)</h2>
             {deepLink ? (
               <>

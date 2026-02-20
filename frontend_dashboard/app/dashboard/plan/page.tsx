@@ -15,9 +15,9 @@ export default function PlanPage() {
   if (!tenant) return <p className="text-slate-500">Carregando...</p>;
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-slate-800 mb-6">Configuração de plano</h1>
-      <div className="max-w-xl rounded-lg border border-slate-200 bg-white p-6 space-y-4">
+    <div className="space-y-4 sm:space-y-6">
+      <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Configuração de plano</h1>
+      <div className="max-w-xl rounded-lg border border-slate-200 bg-white p-4 sm:p-6 space-y-4">
         <p>
           <span className="text-slate-500">Empresa:</span>{" "}
           <span className="font-medium">{tenant.company_name}</span>
