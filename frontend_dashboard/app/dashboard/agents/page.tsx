@@ -9,13 +9,24 @@ type Agent = { id: string; name: string; niche: string | null; prompt_custom: st
 export default function AgentsPage() {
   const [list, setList] = useState<Agent[]>([]);
   const [err, setErr] = useState("");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api<Agent[]>("/agents")
-      .then(setList)
-      .catch((e) => setErr(e.message));
+    setLoading(true);
+    setErr("");
+    api<unknown>("/agents")
+      .then((data) => {
+        const arr = Array.isArray(data) ? data : [];
+        setList(arr as Agent[]);
+      })
+      .catch((e) => {
+        setErr(e instanceof Error ? e.message : "Erro ao carregar agentes.");
+        setList([]);
+      })
+      .finally(() => setLoading(false));
   }, []);
 
+  if (loading) return <p className="text-slate-500">Carregando agentes...</p>;
   if (err) return <p className="text-red-600">{err}</p>;
 
   return (

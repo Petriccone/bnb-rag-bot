@@ -128,7 +128,8 @@ export default function TelegramPage() {
     try {
       await api("/telegram/disconnect", { method: "DELETE" });
       setSuccess("Telegram desconectado.");
-      load();
+      setBotInfo({ bot_username: null, connected: false, agent_id: null });
+      await load();
     } catch {
       setError("Não foi possível desconectar.");
     } finally {

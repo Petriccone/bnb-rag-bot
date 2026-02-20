@@ -166,7 +166,7 @@ def telegram_status(user: dict = Depends(get_current_user)):
             agent_id=cfg.get("agent_id"),
         )
     except Exception:
-        return TelegramBotInfo(connected=True, agent_id=cfg.get("agent_id"))
+        return TelegramBotInfo(connected=False)
 
 
 @router.get("/bot-info", response_model=TelegramBotInfo)
@@ -308,7 +308,10 @@ def telegram_disconnect(user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=403, detail="Usuário sem tenant.")
     cfg = _get_telegram_config(tenant_id)
     if cfg:
-        _delete_telegram_webhook(cfg["bot_token"])
+        try:
+            _delete_telegram_webhook(cfg["bot_token"])
+        except Exception:
+            pass
     with get_cursor() as cur:
         cur.execute("DELETE FROM tenant_telegram_config WHERE tenant_id = %s", (tenant_id,))
     return {"ok": True}
