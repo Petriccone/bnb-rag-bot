@@ -59,7 +59,7 @@ export async function api<T>(
     const msg = e instanceof Error ? e.message : "";
     if (msg === "Failed to fetch" || (e instanceof TypeError && msg.toLowerCase().includes("fetch"))) {
       const hint = typeof window !== "undefined" && window.location.hostname !== "127.0.0.1" && window.location.hostname !== "localhost"
-        ? " No projeto do dashboard (Vercel), defina BACKEND_URL com a URL da API (ex.: https://bnb-rag-api.vercel.app) e faça redeploy."
+        ? " No projeto do dashboard (Vercel), defina NEXT_PUBLIC_API_URL com a URL da API (ex.: https://bnb-rag-api.vercel.app) em Settings → Environment Variables e faça redeploy."
         : " Verifique se o backend está rodando (python run_platform_backend.py) e teste /health no navegador.";
       throw new Error("Não foi possível conectar à API." + hint);
     }

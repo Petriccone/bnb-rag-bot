@@ -10,6 +10,7 @@ export const viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -18,8 +19,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="pt-BR">
-      <body>{children}</body>
+    <html lang="pt-BR" className="w-full overflow-x-hidden">
+      <body className="w-full min-w-0 max-w-full overflow-x-hidden">{children}</body>
     </html>
   );
 }
