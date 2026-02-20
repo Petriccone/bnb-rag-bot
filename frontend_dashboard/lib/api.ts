@@ -28,9 +28,12 @@ function getToken(): string | null {
   return localStorage.getItem("token");
 }
 
+const DEFAULT_API_TIMEOUT_MS = 15000;
+
 export async function api<T>(
   path: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  timeoutMs?: number
 ): Promise<T> {
   const token = getToken();
   const headers: HeadersInit = {
@@ -45,7 +48,8 @@ export async function api<T>(
   (headers as Record<string, string>)["X-Request-Path"] = apiPath;
   const url = `${base}${p}`;
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 15000);
+  const timeout = timeoutMs ?? DEFAULT_API_TIMEOUT_MS;
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
   let res: Response;
   try {
     res = await fetch(url, { ...options, headers, signal: controller.signal });

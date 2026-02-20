@@ -74,10 +74,11 @@ export default function EditAgentPage() {
     setChatMessages((prev) => [...prev, { role: "user", text: msg }]);
     setChatLoading(true);
     try {
-      const res = await api<{ reply: string }>(`/agents/${id}/chat`, {
-        method: "POST",
-        body: JSON.stringify({ message: msg }),
-      });
+      const res = await api<{ reply: string }>(
+        `/agents/${id}/chat`,
+        { method: "POST", body: JSON.stringify({ message: msg }) },
+        60000
+      );
       setChatMessages((prev) => [...prev, { role: "assistant", text: res.reply || "(sem resposta)" }]);
     } catch (err) {
       setChatMessages((prev) => [
