@@ -136,12 +136,10 @@ async def _upload_document_impl(file, embedding_namespace, user, _debug_log):
         # #endregion
         with get_cursor() as cur:
             cur.execute(
-                """INSERT INTO documents (tenant_id, file_path, file_name, file_size_mb, file_type, 
-                          embedding_namespace, status)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s) 
-                   RETURNING id, tenant_id, file_path, file_name, file_size_mb, file_type, 
-                             embedding_namespace, source_url, status""",
-                (tenant_id, file_path, file.filename or "file", file_size_mb, ext[1:], namespace, "pending"),
+                """INSERT INTO documents (tenant_id, file_path, embedding_namespace)
+                   VALUES (%s, %s, %s) 
+                   RETURNING id, tenant_id, file_path, embedding_namespace""",
+                (tenant_id, file_path, namespace),
             )
             row = cur.fetchone()
             doc_id = str(row["id"])
@@ -189,42 +187,46 @@ async def _upload_document_impl(file, embedding_namespace, user, _debug_log):
                             )
                     conn.commit()
                     
-                    # Atualiza status
+                    # Atualiza status (opcional se coluna não existir)
+                    try:
+                        with get_cursor() as cur:
+                            cur.execute(
+                                "UPDATE documents SET status = 'completed' WHERE id = %s",
+                                (doc_id,)
+                            )
+                    except Exception:
+                        pass
+                finally:
+                    conn.close()
+            else:
+                try:
                     with get_cursor() as cur:
                         cur.execute(
                             "UPDATE documents SET status = 'completed' WHERE id = %s",
                             (doc_id,)
                         )
-                finally:
-                    conn.close()
-            else:
-                # Sem conteúdo para indexar
-                with get_cursor() as cur:
-                    cur.execute(
-                        "UPDATE documents SET status = 'completed' WHERE id = %s",
-                        (doc_id,)
-                    )
+                except Exception:
+                    pass
         except Exception as e:
-            # Marca como falho em caso de erro
             try:
                 with get_cursor() as cur:
                     cur.execute(
                         "UPDATE documents SET status = 'failed' WHERE id = %s",
                         (doc_id,)
                     )
-            except:
+            except Exception:
                 pass
 
     return DocumentResponse(
         id=doc_id,
         tenant_id=str(row["tenant_id"]),
         file_path=row["file_path"],
-        file_name=row["file_name"],
-        file_size_mb=float(row["file_size_mb"]),
-        file_type=row["file_type"],
-        embedding_namespace=row["embedding_namespace"],
+        file_name=row.get("file_name") or file.filename or (os.path.basename(row["file_path"]) if row.get("file_path") else "file"),
+        file_size_mb=float(row.get("file_size_mb") or file_size_mb),
+        file_type=row.get("file_type") or ext[1:] or "unknown",
+        embedding_namespace=row.get("embedding_namespace") or namespace,
         source_url=row.get("source_url"),
-        status=row["status"],
+        status=row.get("status") or "pending",
     )
 
 
@@ -277,13 +279,10 @@ async def upload_from_url(
     
     with get_cursor() as cur:
         cur.execute(
-            """INSERT INTO documents (tenant_id, file_path, file_name, file_size_mb, file_type, 
-                      embedding_namespace, source_url, status)
-               VALUES (%s, %s, %s, %s, %s, %s, %s, %s) 
-               RETURNING id, tenant_id, file_path, file_name, file_size_mb, file_type, 
-                         embedding_namespace, source_url, status""",
-            (tenant_id, file_path, request.url.split('/')[-1] or "webpage", 
-             file_size_mb, ext[1:], namespace, request.url, "pending"),
+            """INSERT INTO documents (tenant_id, file_path, embedding_namespace)
+               VALUES (%s, %s, %s) 
+               RETURNING id, tenant_id, file_path, embedding_namespace""",
+            (tenant_id, file_path, namespace),
         )
         row = cur.fetchone()
         doc_id = str(row["id"])
@@ -316,11 +315,14 @@ async def upload_from_url(
                             )
                     conn.commit()
                     
-                    with get_cursor() as cur:
-                        cur.execute(
-                            "UPDATE documents SET status = 'completed' WHERE id = %s",
-                            (doc_id,)
-                        )
+                    try:
+                        with get_cursor() as cur:
+                            cur.execute(
+                                "UPDATE documents SET status = 'completed' WHERE id = %s",
+                                (doc_id,)
+                            )
+                    except Exception:
+                        pass
                 finally:
                     conn.close()
         except Exception as e:
@@ -330,19 +332,19 @@ async def upload_from_url(
                         "UPDATE documents SET status = 'failed' WHERE id = %s",
                         (doc_id,)
                     )
-            except:
+            except Exception:
                 pass
 
     return DocumentResponse(
         id=doc_id,
         tenant_id=str(row["tenant_id"]),
         file_path=row["file_path"],
-        file_name=row["file_name"],
-        file_size_mb=float(row["file_size_mb"]),
-        file_type=row["file_type"],
-        embedding_namespace=row["embedding_namespace"],
-        source_url=row.get("source_url"),
-        status=row["status"],
+        file_name=row.get("file_name") or request.url.split("/")[-1] or "webpage",
+        file_size_mb=float(row.get("file_size_mb") or file_size_mb),
+        file_type=row.get("file_type") or ext[1:] or "unknown",
+        embedding_namespace=row.get("embedding_namespace") or namespace,
+        source_url=row.get("source_url") or request.url,
+        status=row.get("status") or "pending",
     )
 
 
