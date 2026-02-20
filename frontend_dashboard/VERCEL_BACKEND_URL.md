@@ -1,24 +1,18 @@
 # Configurar a API no dashboard (Vercel)
 
-Para login, cadastro e Base de conhecimento funcionarem, o dashboard precisa saber a URL da API.
+O dashboard chama **sempre** o próprio domínio (`/api/*`). O Next.js encaminha para o backend via **rewrite** (next.config.js). Assim o **405 no login/cadastro** some: a requisição não depende de variável no build do cliente.
 
-## Variáveis que o projeto usa
+## Uma variável: BACKEND_URL
 
-- **NEXT_PUBLIC_API_URL** — usada pelo código no navegador (build). Ex.: `https://bnb-rag-api.vercel.app`
-- **BACKEND_URL** — usada pelo rewrite no Next (next.config.js) quando as chamadas passam pelo mesmo domínio.
+1. Projeto do **dashboard** na Vercel → **Settings** → **Environment Variables**.
+2. **Name:** `BACKEND_URL`  
+   **Value:** `https://bnb-rag-api.vercel.app` (URL da API, sem barra no final).
+3. Marque **Production** (e **Preview** se usar).
+4. **Save** → **Deployments** → **Redeploy** (para o rewrite usar a nova variável).
 
-Se você já tem **NEXT_PUBLIC_API_URL** e **BACKEND_URL** definidas (ex.: em "All Environments") com a URL da API, não precisa mudar nada. O cliente usa `NEXT_PUBLIC_API_URL` quando está disponível no build.
+Não é obrigatório ter `NEXT_PUBLIC_API_URL`: o cliente usa o mesmo domínio do dashboard; o rewrite usa `BACKEND_URL`.
 
 ## Erro 405 ou "Não foi possível conectar"
 
-- **405:** em geral a requisição está indo para o dashboard em vez da API. Confira se `NEXT_PUBLIC_API_URL` está definida para o ambiente em que você está fazendo o deploy (Production e/ou Preview) e se fez **Redeploy** depois de alterar variáveis.
-- **Não foi possível conectar:** a URL da API pode estar errada ou a API pode estar fora do ar. Teste abrindo a URL da API no navegador.
-
-## Resumo
-
-| Variável                 | Uso |
-|--------------------------|-----|
-| NEXT_PUBLIC_API_URL      | Cliente (navegador) chama a API direto quando essa variável existe no build. |
-| BACKEND_URL              | Rewrite no Next (next.config.js) encaminha `/api/*` para essa URL. |
-
-Valor em ambos: URL do backend **sem** barra no final (ex.: `https://bnb-rag-api.vercel.app`). Marque os ambientes que você usa (Production / Preview) e faça **Redeploy** após alterar.
+- **405:** o rewrite não está apontando para o backend (falta `BACKEND_URL` no build ou valor errado). Defina `BACKEND_URL` e faça **Redeploy**.
+- **Não foi possível conectar:** URL do backend errada ou API fora do ar. Confira `BACKEND_URL` e se a API responde (abrir a URL no navegador).

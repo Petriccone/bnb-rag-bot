@@ -1,17 +1,16 @@
 /**
- * Base da API (termina em /api).
- * Em produção: NEXT_PUBLIC_API_URL = URL da API (chamada direta).
- * Fallback: mesma origem (rewrite no Next) ou http://127.0.0.1:8000.
+ * Base da API: no browser sempre mesma origem (dashboard).
+ * O Next.js faz rewrite de /api/* para o backend (next.config.js usa BACKEND_URL).
+ * Assim evita 405: a requisição não depende de NEXT_PUBLIC_ no build.
  */
 function getApiBaseUrl(): string {
-  const envUrl = process.env.NEXT_PUBLIC_API_URL;
-  const raw =
-    (typeof envUrl === "string" ? envUrl.trim() : "") ||
-    (typeof window !== "undefined" ? window.location.origin : "") ||
-    "http://127.0.0.1:8000";
-  const base = String(raw).replace(/\/+$/, "").replace(/(\/)+/g, "/");
-  const withApi = base.endsWith("/api") ? base : base + "/api";
-  return withApi.replace(/(\/)+/g, "/");
+  if (typeof window !== "undefined" && window.location?.origin) {
+    const o = String(window.location.origin).replace(/\/+$/, "");
+    return o.endsWith("/api") ? o : `${o}/api`;
+  }
+  const fallback = process.env.NEXT_PUBLIC_API_URL || process.env.BACKEND_URL || "http://127.0.0.1:8000";
+  const base = String(fallback).replace(/\/+$/, "");
+  return base.endsWith("/api") ? base : `${base}/api`;
 }
 export function getApiBase(): string {
   return getApiBaseUrl();
@@ -44,8 +43,7 @@ export async function api<T>(
   const p = path.startsWith("/") ? path : `/${path}`;
   const apiPath = "/api" + (p.startsWith("/") ? p : `/${p}`);
   (headers as Record<string, string>)["X-Request-Path"] = apiPath;
-  const sep = base.includes("?") ? "&" : "?";
-  const url = `${base}${p}${sep}_path=${encodeURIComponent(apiPath)}`;
+  const url = `${base}${p}`;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 15000);
   let res: Response;
@@ -59,7 +57,7 @@ export async function api<T>(
     const msg = e instanceof Error ? e.message : "";
     if (msg === "Failed to fetch" || (e instanceof TypeError && msg.toLowerCase().includes("fetch"))) {
       const hint = typeof window !== "undefined" && window.location.hostname !== "127.0.0.1" && window.location.hostname !== "localhost"
-        ? " No projeto do dashboard (Vercel), defina NEXT_PUBLIC_API_URL com a URL da API (ex.: https://bnb-rag-api.vercel.app) em Settings → Environment Variables e faça redeploy."
+        ? " No projeto do dashboard (Vercel), defina BACKEND_URL com a URL da API (ex.: https://bnb-rag-api.vercel.app) em Settings → Environment Variables e faça redeploy."
         : " Verifique se o backend está rodando (python run_platform_backend.py) e teste /health no navegador.";
       throw new Error("Não foi possível conectar à API." + hint);
     }

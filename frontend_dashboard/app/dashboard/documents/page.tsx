@@ -14,16 +14,17 @@ type Doc = {
   status?: string;
 };
 
-/** URL do POST /api/documents/upload: mesma lógica que api.ts (NEXT_PUBLIC_API_URL ou mesma origem). */
+/** URL do POST /api/documents/upload: mesma origem (rewrite encaminha para o backend). */
 function getDocumentsUploadUrl(): string {
-  const envUrl = process.env.NEXT_PUBLIC_API_URL;
-  const raw =
-    (typeof envUrl === "string" ? envUrl.trim() : "") ||
-    (typeof window !== "undefined" ? window.location.origin : "") ||
-    "http://127.0.0.1:8000";
-  const origin = String(raw).replace(/\/+$/, "");
-  const apiBase = origin.endsWith("/api") ? origin : `${origin}/api`;
-  return `${apiBase.replace(/\/+$/, "")}/documents/upload`;
+  if (typeof window !== "undefined" && window.location?.origin) {
+    const o = String(window.location.origin).replace(/\/+$/, "");
+    const api = o.endsWith("/api") ? o : `${o}/api`;
+    return `${api}/documents/upload`;
+  }
+  const fallback = process.env.NEXT_PUBLIC_API_URL || process.env.BACKEND_URL || "http://127.0.0.1:8000";
+  const base = String(fallback).replace(/\/+$/, "");
+  const api = base.endsWith("/api") ? base : `${base}/api`;
+  return `${api}/documents/upload`;
 }
 
 export default function DocumentsPage() {
@@ -70,7 +71,7 @@ export default function DocumentsPage() {
       if (e instanceof Error) {
         if (e.name === "AbortError") setErr("Upload demorou muito (timeout). Tente um arquivo menor.");
         else if (e.message === "Failed to fetch" || e.message.includes("fetch"))
-          setErr("Não foi possível conectar à API. No projeto do dashboard (Vercel), defina NEXT_PUBLIC_API_URL com a URL da API (ex.: https://bnb-rag-api.vercel.app) em Settings → Environment Variables e faça redeploy.");
+          setErr("Não foi possível conectar à API. No projeto do dashboard (Vercel), defina BACKEND_URL com a URL da API (ex.: https://bnb-rag-api.vercel.app) e faça redeploy.");
         else setErr(e.message);
       } else setErr("Erro no upload");
     } finally {
