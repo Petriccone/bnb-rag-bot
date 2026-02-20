@@ -33,10 +33,20 @@ def _get_client() -> OpenAI:
     )
 
 
-def load_directives(skip_persona: bool = False, skip_spin_examples: bool = False) -> str:
+# Arquivos de diretiva que mencionam filtro/água e são ignorados quando o agente tem persona customizada
+_DIRECTIVES_WITH_FILTER_PRODUCT = frozenset({
+    "sdr_personalidade.md",
+    "spin_selling.md",
+    "envio_imagens.md",
+    "fechamento.md",
+})
+
+
+def load_directives(skip_persona: bool = False, skip_spin_examples: bool = False, skip_product_directives: bool = False) -> str:
     """Concatena o conteúdo de todos os .md em directives/ em ordem fixa.
-    skip_persona: não carrega sdr_personalidade.md (evita 'filtros de água' sobrescrever agente customizado).
-    skip_spin_examples: não carrega spin_selling.md (evita exemplos 'torneira, galão, filtro' no script de descoberta).
+    skip_persona: não carrega sdr_personalidade.md.
+    skip_spin_examples: não carrega spin_selling.md.
+    skip_product_directives: não carrega nenhum arquivo que menciona filtro/água (sdr, spin, envio_imagens, fechamento).
     """
     order = [
         "sdr_personalidade.md",
@@ -49,6 +59,8 @@ def load_directives(skip_persona: bool = False, skip_spin_examples: bool = False
     ]
     parts = []
     for name in order:
+        if skip_product_directives and name in _DIRECTIVES_WITH_FILTER_PRODUCT:
+            continue
         if skip_persona and name == "sdr_personalidade.md":
             continue
         if skip_spin_examples and name == "spin_selling.md":
@@ -75,7 +87,11 @@ def build_system_prompt(
     has_custom_persona = bool(
         agent_name or agent_niche or (agent_prompt_custom and agent_prompt_custom.strip())
     )
-    directives = load_directives(skip_persona=has_custom_persona, skip_spin_examples=has_custom_persona)
+    directives = load_directives(
+        skip_persona=has_custom_persona,
+        skip_spin_examples=has_custom_persona,
+        skip_product_directives=has_custom_persona,
+    )
 
     if has_custom_persona:
         persona = f"Você é {agent_name or 'o agente'}"

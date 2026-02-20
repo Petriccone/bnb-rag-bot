@@ -87,6 +87,9 @@ def run_agent_facade(
         )
 
     recent_log = get_recent_log(lead_id, limit=12, tenant_id=tenant_id, agent_id=agent_id)
+    # Chat de teste do dashboard: enviar só mensagens do usuário no histórico (não as do assistente) para não reaproveitar respostas antigas de outro nicho (ex.: filtro)
+    if lead_id == "dashboard-test" and recent_log:
+        recent_log = [m for m in recent_log if m.get("role") == "user"]
 
     # Prefer overrides (ex.: API já carregou o agente com PLATFORM_DATABASE_URL); senão tenta get_agent_by_id (DATABASE_URL)
     agent_name = agent_name_override
