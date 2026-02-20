@@ -1,39 +1,24 @@
 # Configurar a API no dashboard (Vercel)
 
-Para login, cadastro e **upload na Base de conhecimento** funcionarem em produção, o frontend precisa saber a URL da API.
+Para login, cadastro e Base de conhecimento funcionarem, o dashboard precisa saber a URL da API.
 
-## Erro 405 no upload (/documents)
+## Variáveis que o projeto usa
 
-Se ao enviar um arquivo em **Base de conhecimento** aparecer **405** ou "Failed to load resource: 405", o navegador está mandando o POST para o próprio dashboard em vez da API. A solução é configurar `NEXT_PUBLIC_API_URL` no projeto do dashboard na Vercel (abaixo) e fazer **Redeploy**.
+- **NEXT_PUBLIC_API_URL** — usada pelo código no navegador (build). Ex.: `https://bnb-rag-api.vercel.app`
+- **BACKEND_URL** — usada pelo rewrite no Next (next.config.js) quando as chamadas passam pelo mesmo domínio.
 
----
+Se você já tem **NEXT_PUBLIC_API_URL** e **BACKEND_URL** definidas (ex.: em "All Environments") com a URL da API, não precisa mudar nada. O cliente usa `NEXT_PUBLIC_API_URL` quando está disponível no build.
 
-## Opção recomendada (evita 405 no cadastro e no upload)
+## Erro 405 ou "Não foi possível conectar"
 
-Chamada **direta** do navegador para a API (o backend já tem CORS liberado).
+- **405:** em geral a requisição está indo para o dashboard em vez da API. Confira se `NEXT_PUBLIC_API_URL` está definida para o ambiente em que você está fazendo o deploy (Production e/ou Preview) e se fez **Redeploy** depois de alterar variáveis.
+- **Não foi possível conectar:** a URL da API pode estar errada ou a API pode estar fora do ar. Teste abrindo a URL da API no navegador.
 
-1. Abra a [Vercel](https://vercel.com) e entre no projeto do **dashboard** (Root = `frontend_dashboard`).
+## Resumo
 
-2. **Settings** → **Environment Variables**.
+| Variável                 | Uso |
+|--------------------------|-----|
+| NEXT_PUBLIC_API_URL      | Cliente (navegador) chama a API direto quando essa variável existe no build. |
+| BACKEND_URL              | Rewrite no Next (next.config.js) encaminha `/api/*` para essa URL. |
 
-3. Adicione:
-   - **Name:** `NEXT_PUBLIC_API_URL`
-   - **Value:** `https://bnb-rag-api.vercel.app`  
-   **Importante:** sem barra no final, sem `/api`. Ex.: `https://bnb-rag-api.vercel.app` (não `https://bnb-rag-api.vercel.app/`).  
-   Use a URL do seu projeto da API se for diferente.
-
-4. Marque **Production** (e Preview se quiser) e salve.
-
-5. **Deployments** → **Redeploy** (para o build pegar a variável).
-
-Com isso, o cadastro/login passa a funcionar (o navegador chama a API diretamente).
-
----
-
-## Opção alternativa (proxy pelo Next.js)
-
-Se preferir que as chamadas passem pelo mesmo domínio do dashboard:
-
-- **Name:** `BACKEND_URL`  
-- **Value:** `https://bnb-rag-api.vercel.app`  
-- Depois do primeiro deploy com essa variável, faça **Redeploy** para o rewrite ser aplicado.
+Valor em ambos: URL do backend **sem** barra no final (ex.: `https://bnb-rag-api.vercel.app`). Marque os ambientes que você usa (Production / Preview) e faça **Redeploy** após alterar.

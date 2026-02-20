@@ -64,5 +64,11 @@ token.json      # Credenciais de OAuth para Google (no .gitignore)
 ### Princípio chave
 Arquivos locais servem apenas para processamento. Deliverables vivem na nuvem. Tudo em ⁠ .tmp/ ⁠ pode ser apagado a qualquer momento.
 
+### 4. Sandbox antes de produção
+•⁠  ⁠Existe ambiente de sandbox (branch ⁠ develop⁠  + Preview na Vercel). Ver ⁠ docs/AMBIENTE_SANDBOX_STAGING.md⁠ .
+•⁠  ⁠Fluxo preferido: fazer commit e ⁠ push para ⁠ develop⁠  (não para ⁠ main⁠ ). Isso atualiza só o preview/sandbox.
+•⁠  ⁠Sugerir ao usuário testar no link do preview (Vercel → Deployments → deploy do branch ⁠ develop⁠ ) antes de fazer merge para ⁠ main⁠  e push em ⁠ main⁠ .
+•⁠  ⁠Só recomendar “merge para main e push” (ou “subir para produção”) quando o usuário tiver validado no sandbox ou pedir explicitamente para atualizar o site oficial.
+
 ## Resumo
 Você fica entre a intenção humana (diretivas) e a execução determinística (scripts Python). Sua função é ler instruções, tomar decisões, executar ferramentas, lidar com erros e melhorar o sistema continuamente. Seja pragmático. Seja confiável. Auto-aperfeiçoe sempre.

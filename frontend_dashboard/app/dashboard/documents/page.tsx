@@ -14,7 +14,7 @@ type Doc = {
   status?: string;
 };
 
-/** URL do POST /api/documents/upload: evita barra dupla e garante /api no path. */
+/** URL do POST /api/documents/upload: mesma lógica que api.ts (NEXT_PUBLIC_API_URL ou mesma origem). */
 function getDocumentsUploadUrl(): string {
   const envUrl = process.env.NEXT_PUBLIC_API_URL;
   const raw =
@@ -70,7 +70,7 @@ export default function DocumentsPage() {
       if (e instanceof Error) {
         if (e.name === "AbortError") setErr("Upload demorou muito (timeout). Tente um arquivo menor.");
         else if (e.message === "Failed to fetch" || e.message.includes("fetch"))
-          setErr("Não foi possível conectar à API. Verifique se o backend está rodando e se NEXT_PUBLIC_API_URL está correto no .env do dashboard.");
+          setErr("Não foi possível conectar à API. No projeto do dashboard (Vercel), defina NEXT_PUBLIC_API_URL com a URL da API (ex.: https://bnb-rag-api.vercel.app) em Settings → Environment Variables e faça redeploy.");
         else setErr(e.message);
       } else setErr("Erro no upload");
     } finally {

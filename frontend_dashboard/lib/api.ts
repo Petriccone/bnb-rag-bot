@@ -1,12 +1,12 @@
 /**
  * Base da API (termina em /api).
- * Em produção: use NEXT_PUBLIC_API_URL = URL da API (chamada direta, evita 405 do proxy).
- * Desenvolvimento: mesma origem ou http://127.0.0.1:8000.
+ * Em produção: NEXT_PUBLIC_API_URL = URL da API (chamada direta).
+ * Fallback: mesma origem (rewrite no Next) ou http://127.0.0.1:8000.
  */
 function getApiBaseUrl(): string {
   const envUrl = process.env.NEXT_PUBLIC_API_URL;
   const raw =
-    envUrl ||
+    (typeof envUrl === "string" ? envUrl.trim() : "") ||
     (typeof window !== "undefined" ? window.location.origin : "") ||
     "http://127.0.0.1:8000";
   const base = String(raw).replace(/\/+$/, "").replace(/(\/)+/g, "/");
