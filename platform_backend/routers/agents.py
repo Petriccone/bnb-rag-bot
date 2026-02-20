@@ -235,6 +235,9 @@ def agent_chat(agent_id: UUID, body: ChatRequest, user: dict = Depends(get_curre
             tenant_id=tenant_id,
             agent_id=str(row["id"]),
             embedding_namespace_override=embedding_namespace,
+            agent_name_override=row.get("name"),
+            agent_niche_override=row.get("niche"),
+            agent_prompt_custom_override=row.get("prompt_custom"),
         )
         reply = (out.get("resposta_texto") or "").strip()
         return {"reply": reply}

@@ -33,9 +33,10 @@ def _get_client() -> OpenAI:
     )
 
 
-def load_directives(skip_persona: bool = False) -> str:
+def load_directives(skip_persona: bool = False, skip_spin_examples: bool = False) -> str:
     """Concatena o conteúdo de todos os .md em directives/ em ordem fixa.
-    Se skip_persona=True, não carrega sdr_personalidade.md (evita 'filtros de água' sobrescrever agente customizado).
+    skip_persona: não carrega sdr_personalidade.md (evita 'filtros de água' sobrescrever agente customizado).
+    skip_spin_examples: não carrega spin_selling.md (evita exemplos 'torneira, galão, filtro' no script de descoberta).
     """
     order = [
         "sdr_personalidade.md",
@@ -49,6 +50,8 @@ def load_directives(skip_persona: bool = False) -> str:
     parts = []
     for name in order:
         if skip_persona and name == "sdr_personalidade.md":
+            continue
+        if skip_spin_examples and name == "spin_selling.md":
             continue
         path = DIRECTIVES_DIR / name
         if path.exists():
@@ -72,7 +75,7 @@ def build_system_prompt(
     has_custom_persona = bool(
         agent_name or agent_niche or (agent_prompt_custom and agent_prompt_custom.strip())
     )
-    directives = load_directives(skip_persona=has_custom_persona)
+    directives = load_directives(skip_persona=has_custom_persona, skip_spin_examples=has_custom_persona)
 
     if has_custom_persona:
         persona = f"Você é {agent_name or 'o agente'}"
@@ -82,8 +85,9 @@ def build_system_prompt(
         if agent_prompt_custom and agent_prompt_custom.strip():
             persona += f"Instruções específicas: {agent_prompt_custom.strip()}. "
         persona += (
-            "As diretivas abaixo são apenas para estilo de comunicação e método SPIN; "
-            "NÃO fale de filtros, água ou qualquer produto que não seja do seu nicho. "
+            "As diretivas abaixo são apenas para estilo de comunicação; "
+            "NÃO fale de filtros, água, torneira, galão ou qualquer produto que não seja do seu nicho. "
+            "Use o método SPIN na ordem: descoberta (perguntas sobre a situação do cliente no SEU nicho) -> problema (dores) -> implicação (riscos) -> solução/oferta -> fechamento. "
             "Siga as diretivas abaixo.\n\n"
         )
     else:
@@ -99,7 +103,7 @@ def build_system_prompt(
         "Se o cliente repetir a mesma coisa (ex.: vários 'oi'), varie a resposta em vez de repetir igual. "
         "Cada resposta deve ser específica para o que ele acabou de dizer.\n\n"
         "UMA ENTRADA = UMA RESPOSTA: Se a mensagem do cliente tiver várias linhas ou várias frases juntas "
-        "(ex.: 'Oi' 'tudo bem?' 'quero ver filtros' em sequência), trate como UMA só intenção e responda "
+        "(ex.: 'Oi' 'tudo bem?' 'quero mais informações' em sequência), trate como UMA só intenção e responda "
         "UMA única vez, de forma natural. Não responda ponto a ponto para cada linha ou frase.\n\n"
         "Responda em JSON no formato:\n"
         '{"resposta_texto": "...", "enviar_audio": true/false, "proximo_estado": "...", '

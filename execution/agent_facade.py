@@ -39,6 +39,9 @@ def run_agent_facade(
     agent_id: Optional[str] = None,
     drive_folder_id_override: Optional[str] = None,
     embedding_namespace_override: Optional[str] = None,
+    agent_name_override: Optional[str] = None,
+    agent_niche_override: Optional[str] = None,
+    agent_prompt_custom_override: Optional[str] = None,
 ) -> dict[str, Any]:
     """
     Executa uma rodada do agente: sessão, RAG, LLM, transição de estado, log.
@@ -85,11 +88,18 @@ def run_agent_facade(
 
     recent_log = get_recent_log(lead_id, limit=12, tenant_id=tenant_id, agent_id=agent_id)
 
-    agent_info = None
-    if agent_id:
+    # Prefer overrides (ex.: API já carregou o agente com PLATFORM_DATABASE_URL); senão tenta get_agent_by_id (DATABASE_URL)
+    agent_name = agent_name_override
+    agent_niche = agent_niche_override
+    agent_prompt_custom = agent_prompt_custom_override
+    if agent_name is None and agent_niche is None and agent_prompt_custom is None and agent_id:
         try:
             from .tenant_config import get_agent_by_id
             agent_info = get_agent_by_id(agent_id)
+            if agent_info:
+                agent_name = agent_info.get("name")
+                agent_niche = agent_info.get("niche")
+                agent_prompt_custom = agent_info.get("prompt_custom")
         except Exception:
             pass
 
@@ -101,9 +111,9 @@ def run_agent_facade(
         rag_context=rag_context,
         recent_log=recent_log,
         input_was_audio=is_audio,
-        agent_name=(agent_info or {}).get("name"),
-        agent_niche=(agent_info or {}).get("niche"),
-        agent_prompt_custom=(agent_info or {}).get("prompt_custom"),
+        agent_name=agent_name,
+        agent_niche=agent_niche,
+        agent_prompt_custom=agent_prompt_custom,
     )
 
     resposta_texto = (out.get("resposta_texto") or "").strip()
