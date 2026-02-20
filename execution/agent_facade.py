@@ -38,6 +38,7 @@ def run_agent_facade(
     tenant_id: Optional[str] = None,
     agent_id: Optional[str] = None,
     drive_folder_id_override: Optional[str] = None,
+    embedding_namespace_override: Optional[str] = None,
 ) -> dict[str, Any]:
     """
     Executa uma rodada do agente: sessão, RAG, LLM, transição de estado, log.
@@ -59,7 +60,10 @@ def run_agent_facade(
         # Base de conhecimento por documentos enviados no dashboard (pgvector)
         try:
             from .knowledge_rag import search_document_chunks
-            rag_context = search_document_chunks(tenant_id, user_text, limit=6)
+            rag_context = search_document_chunks(
+                tenant_id, user_text, limit=6,
+                embedding_namespace=embedding_namespace_override,
+            )
         except Exception as e:
             rag_context = (
                 "CONTEXTO: Base de conhecimento indisponível. Não invente dados. "

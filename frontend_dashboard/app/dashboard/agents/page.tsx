@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 
-type Agent = { id: string; name: string; niche: string | null; prompt_custom: string | null; active: boolean };
+type Agent = { id: string; name: string; niche: string | null; prompt_custom: string | null; active: boolean; embedding_namespace?: string | null };
 
 export default function AgentsPage() {
   const [list, setList] = useState<Agent[]>([]);
@@ -58,12 +58,14 @@ export default function AgentsPage() {
             <span className={a.active ? "text-green-600 text-sm" : "text-slate-400 text-sm"}>
               {a.active ? "Ativo" : "Inativo"}
             </span>
-            <Link
-              href={`/dashboard/agents/${a.id}`}
-              className="self-start mt-1 text-blue-600 hover:underline text-sm min-h-[44px] flex items-center"
-            >
-              Editar
-            </Link>
+            <div className="flex gap-2 mt-1">
+              <Link href={`/dashboard/agents/${a.id}`} className="text-blue-600 hover:underline text-sm">
+                Editar
+              </Link>
+              <Link href={`/dashboard/agents/${a.id}?test=1`} className="text-emerald-600 hover:underline text-sm">
+                Testar
+              </Link>
+            </div>
           </div>
         ))}
       </div>
@@ -97,12 +99,18 @@ export default function AgentsPage() {
                       {a.active ? "Ativo" : "Inativo"}
                     </span>
                   </td>
-                  <td className="p-3">
+                  <td className="p-3 flex flex-wrap gap-2">
                     <Link
                       href={`/dashboard/agents/${a.id}`}
                       className="text-blue-600 hover:underline text-sm"
                     >
                       Editar
+                    </Link>
+                    <Link
+                      href={`/dashboard/agents/${a.id}?test=1`}
+                      className="text-emerald-600 hover:underline text-sm"
+                    >
+                      Testar
                     </Link>
                   </td>
                 </tr>

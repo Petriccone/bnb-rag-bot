@@ -32,6 +32,7 @@ export default function DocumentsPage() {
   const [err, setErr] = useState("");
   const [uploading, setUploading] = useState(false);
   const [file, setFile] = useState<File | null>(null);
+  const [uploadNamespace, setUploadNamespace] = useState("");
 
   function load() {
     api<Doc[]>("/documents")
@@ -49,7 +50,8 @@ export default function DocumentsPage() {
     const form = new FormData();
     form.append("file", file);
     const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-    const url = getDocumentsUploadUrl();
+    let url = getDocumentsUploadUrl();
+    if (uploadNamespace.trim()) url += "?embedding_namespace=" + encodeURIComponent(uploadNamespace.trim());
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 60000);
@@ -119,6 +121,17 @@ export default function DocumentsPage() {
             onChange={(e) => setFile(e.target.files?.[0] ?? null)}
             className="block w-full text-sm text-slate-500 file:mr-2 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 min-h-[44px]"
           />
+        </div>
+        <div className="w-full sm:w-48 min-w-0">
+          <label className="block text-sm font-medium text-slate-700 mb-1">Namespace (agente)</label>
+          <input
+            type="text"
+            value={uploadNamespace}
+            onChange={(e) => setUploadNamespace(e.target.value)}
+            placeholder="ex: agente_vendas"
+            className="w-full rounded-lg border border-slate-300 px-3 py-2.5 min-h-[44px] text-sm"
+          />
+          <p className="text-xs text-slate-500 mt-0.5">Opcional. Use o mesmo valor do agente.</p>
         </div>
         <button
           type="submit"

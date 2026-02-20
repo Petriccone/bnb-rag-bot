@@ -45,11 +45,12 @@ def search_document_chunks(
     tenant_id: str,
     query: str,
     limit: int = 6,
+    embedding_namespace: Optional[str] = None,
 ) -> str:
     """
     Busca na base de conhecimento do tenant.
+    Se embedding_namespace for informado, usa apenas documentos desse namespace (por agente).
     Retorna um único texto com os trechos mais relevantes para o LLM.
-    Se não houver OPENAI_API_KEY ou não existir tabela/extension, retorna string vazia ou mensagem de fallback.
     """
     if not query or not query.strip():
         return ""
@@ -66,30 +67,60 @@ def search_document_chunks(
     except Exception as e:
         return f"CONTEXTO: Erro ao buscar na base de conhecimento ({e}). Não invente dados."
 
-    conn = None
+    rows = []
     try:
         conn = _get_connection()
-        with conn.cursor() as cur:
-            # pgvector: <=> = cosine distance (menor = mais similar)
-            cur.execute(
-                """
-                SELECT content FROM document_chunks
-                WHERE tenant_id = %s AND embedding IS NOT NULL
-                ORDER BY embedding <=> %s::vector
-                LIMIT %s
-                """,
-                (tenant_id, vec_str, limit),
-            )
-            rows = cur.fetchall()
-    except Exception as e:
-        # Tabela ou extensão pode não existir
-        return (
-            "CONTEXTO: Base de conhecimento indisponível no momento. "
-            "Não invente preços ou especificações."
-        )
-    finally:
-        if conn:
+        try:
+            with conn.cursor() as cur:
+                if embedding_namespace:
+                    cur.execute(
+                        """
+                        SELECT dc.content FROM document_chunks dc
+                        JOIN documents d ON d.id = dc.document_id AND d.tenant_id = dc.tenant_id
+                        WHERE dc.tenant_id = %s AND d.embedding_namespace = %s AND dc.embedding IS NOT NULL
+                        ORDER BY dc.embedding <=> %s::vector
+                        LIMIT %s
+                        """,
+                        (tenant_id, embedding_namespace, vec_str, limit),
+                    )
+                else:
+                    cur.execute(
+                        """
+                        SELECT dc.content FROM document_chunks dc
+                        WHERE dc.tenant_id = %s AND dc.embedding IS NOT NULL
+                        ORDER BY dc.embedding <=> %s::vector
+                        LIMIT %s
+                        """,
+                        (tenant_id, vec_str, limit),
+                    )
+                rows = cur.fetchall()
+        finally:
             conn.close()
+    except Exception as e:
+        if embedding_namespace:
+            try:
+                conn2 = _get_connection()
+                try:
+                    with conn2.cursor() as cur:
+                        cur.execute(
+                            """
+                            SELECT content FROM document_chunks
+                            WHERE tenant_id = %s AND embedding IS NOT NULL
+                            ORDER BY embedding <=> %s::vector
+                            LIMIT %s
+                            """,
+                            (tenant_id, vec_str, limit),
+                        )
+                        rows = cur.fetchall()
+                finally:
+                    conn2.close()
+            except Exception:
+                pass
+        if not rows:
+            return (
+                "CONTEXTO: Base de conhecimento indisponível no momento. "
+                "Não invente preços ou especificações."
+            )
 
     if not rows:
         return ""

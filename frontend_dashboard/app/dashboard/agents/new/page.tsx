@@ -10,6 +10,7 @@ export default function NewAgentPage() {
   const [name, setName] = useState("");
   const [niche, setNiche] = useState("");
   const [prompt_custom, setPromptCustom] = useState("");
+  const [embedding_namespace, setEmbeddingNamespace] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -20,7 +21,12 @@ export default function NewAgentPage() {
     try {
       await api("/agents", {
         method: "POST",
-        body: JSON.stringify({ name, niche: niche || null, prompt_custom: prompt_custom || null }),
+        body: JSON.stringify({
+          name,
+          niche: niche || null,
+          prompt_custom: prompt_custom || null,
+          embedding_namespace: embedding_namespace.trim() || null,
+        }),
       });
       router.replace("/dashboard/agents");
     } catch (err) {
@@ -70,6 +76,17 @@ export default function NewAgentPage() {
             className="w-full rounded-lg border border-slate-300 px-3 py-2 min-h-[100px]"
             placeholder="Instruções adicionais ao agente SDR (SPIN é sempre aplicado)"
           />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Base de conhecimento (namespace, opcional)</label>
+          <input
+            type="text"
+            value={embedding_namespace}
+            onChange={(e) => setEmbeddingNamespace(e.target.value)}
+            placeholder="ex: agente_vendas"
+            className="w-full rounded-lg border border-slate-300 px-3 py-2.5 min-h-[44px]"
+          />
+          <p className="text-xs text-slate-500 mt-0.5">Use o mesmo valor ao enviar documentos na Base de conhecimento.</p>
         </div>
         {error && <p className="text-red-600 text-sm">{error}</p>}
         <button
