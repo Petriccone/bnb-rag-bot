@@ -62,6 +62,9 @@ export default function DocumentsPage() {
       clearTimeout(timeoutId);
       if (!res.ok) {
         const body = await res.json().catch(() => ({ detail: res.statusText }));
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/bda2a585-6330-4387-9d59-18331d5ab5ec',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'21fe81'},body:JSON.stringify({sessionId:'21fe81',location:'documents/page.tsx:upload',message:'upload !res.ok',data:{status:res.status,statusText:res.statusText,body},hypothesisId:'D',timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
         const detail = typeof body.detail === "string" ? body.detail : body.detail?.message ?? "Erro no servidor";
         throw new Error(detail);
       }

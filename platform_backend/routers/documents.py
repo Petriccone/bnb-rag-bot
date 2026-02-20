@@ -76,7 +76,32 @@ async def upload_document(
     Upload de documento para a base de conhecimento.
     Suporta: .txt, .pdf, .xlsx, .xls, .docx, .csv, .md, .html
     """
+    # #region agent log
+    _log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "debug-21fe81.log")
+    def _debug_log(msg: str, data: dict, hyp: str):
+        import json
+        payload = {"sessionId": "21fe81", "location": "documents.py:upload", "message": msg, "data": data, "hypothesisId": hyp, "timestamp": __import__("time").time() * 1000}
+        print(f"[DEBUG 21fe81] {json.dumps(payload)}")
+        try:
+            with open(_log_path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(payload) + "\n")
+        except Exception:
+            pass
+    # #endregion
+    try:
+        return await _upload_document_impl(file, embedding_namespace, user, _debug_log)
+    except HTTPException:
+        raise
+    except Exception as e:
+        _debug_log("upload_document unhandled", {"error_type": type(e).__name__, "error_msg": str(e)}, "A")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+async def _upload_document_impl(file, embedding_namespace, user, _debug_log):
     tenant_id = _ensure_tenant(user)
+    # #region agent log
+    _debug_log("upload_document entry", {"tenant_id": tenant_id, "filename": file.filename}, "A")
+    # #endregion
     settings = get_settings()
     
     # Valida extensão
@@ -89,30 +114,39 @@ async def upload_document(
             detail=f"Formato não suportado. Use: {', '.join(allowed_extensions)}"
         )
     
-    os.makedirs(settings.upload_dir, exist_ok=True)
-    safe_name = f"{uuid.uuid4()}{ext}"
-    file_path = os.path.join(settings.upload_dir, safe_name)
-    
-    # Salva arquivo
-    content = await file.read()
-    with open(file_path, "wb") as f:
-        f.write(content)
-    
-    file_size_mb = len(content) / (1024 * 1024)
-    namespace = embedding_namespace or f"tenant_{tenant_id}"
+    row = None
     doc_id = None
-    
-    with get_cursor() as cur:
-        cur.execute(
-            """INSERT INTO documents (tenant_id, file_path, file_name, file_size_mb, file_type, 
-                      embedding_namespace, status)
-               VALUES (%s, %s, %s, %s, %s, %s, %s) 
-               RETURNING id, tenant_id, file_path, file_name, file_size_mb, file_type, 
-                         embedding_namespace, source_url, status""",
-            (tenant_id, file_path, file.filename or "file", file_size_mb, ext[1:], namespace, "pending"),
-        )
-        row = cur.fetchone()
-        doc_id = str(row["id"])
+    try:
+        os.makedirs(settings.upload_dir, exist_ok=True)
+        safe_name = f"{uuid.uuid4()}{ext}"
+        file_path = os.path.join(settings.upload_dir, safe_name)
+        # #region agent log
+        _debug_log("before file save", {"upload_dir": settings.upload_dir, "file_path": file_path}, "B")
+        # #endregion
+        content = await file.read()
+        with open(file_path, "wb") as f:
+            f.write(content)
+        file_size_mb = len(content) / (1024 * 1024)
+        namespace = embedding_namespace or f"tenant_{tenant_id}"
+        # #region agent log
+        _debug_log("before INSERT", {"doc_id": doc_id}, "A")
+        # #endregion
+        with get_cursor() as cur:
+            cur.execute(
+                """INSERT INTO documents (tenant_id, file_path, file_name, file_size_mb, file_type, 
+                          embedding_namespace, status)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s) 
+                   RETURNING id, tenant_id, file_path, file_name, file_size_mb, file_type, 
+                             embedding_namespace, source_url, status""",
+                (tenant_id, file_path, file.filename or "file", file_size_mb, ext[1:], namespace, "pending"),
+            )
+            row = cur.fetchone()
+            doc_id = str(row["id"])
+    except Exception as e:
+        # #region agent log
+        _debug_log("upload step failed", {"error_type": type(e).__name__, "error_msg": str(e)}, "A")
+        # #endregion
+        raise
 
     # Inicia processamento (ingestão para base de conhecimento)
     if doc_id and ext in {".txt", ".pdf", ".xlsx", ".xls", ".docx", ".csv", ".md", ".html"}:
