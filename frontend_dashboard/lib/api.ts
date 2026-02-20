@@ -69,6 +69,11 @@ export async function api<T>(
   }
   clearTimeout(timeoutId);
   if (!res.ok) {
+    if (res.status === 401) {
+      clearToken();
+      if (typeof window !== "undefined") window.location.replace("/login");
+      throw new Error("Sessão expirada ou token inválido. Faça login novamente.");
+    }
     const err = await res.json().catch(() => ({ detail: res.statusText }));
     const detail = err.detail ?? err.message ?? err.error;
     const msg =
