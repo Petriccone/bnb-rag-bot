@@ -39,7 +39,7 @@ class TenantContextMiddleware(BaseHTTPMiddleware):
         "/openapi.json",
         "/redoc",
         "/api/auth/",  # Auth endpoints
-    }
+    )
     
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
@@ -88,6 +88,7 @@ class TenantContextMiddleware(BaseHTTPMiddleware):
         # Injeta contexto no request.state
         request.state.user_id = payload.get("sub")
         request.state.tenant_id = tenant_id
+        request.state.role = payload.get("role", "company_user")
         request.state.plan = payload.get("plan", "free")
         request.state.email = payload.get("email")
         request.state.token_payload = payload
@@ -106,6 +107,7 @@ def get_user_from_request(request: Request) -> Optional[dict]:
     return {
         "user_id": getattr(request.state, "user_id", None),
         "tenant_id": getattr(request.state, "tenant_id", None),
+        "role": getattr(request.state, "role", "company_user"),
         "plan": getattr(request.state, "plan", "free"),
         "email": getattr(request.state, "email", None),
     }

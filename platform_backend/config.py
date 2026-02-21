@@ -18,5 +18,12 @@ def get_settings():
         jwt_secret=_env("PLATFORM_JWT_SECRET", "change-me-in-production"),
         jwt_algorithm="HS256",
         jwt_expire_minutes=60,
+        jwt_refresh_expire_days=30,
+        stripe_secret_key=_env("STRIPE_SECRET_KEY"),
+        stripe_webhook_secret=_env("STRIPE_WEBHOOK_SECRET"),
+        stripe_starter_price_id=_env("STRIPE_STARTER_PRICE_ID"),
+        stripe_growth_price_id=_env("STRIPE_GROWTH_PRICE_ID"),
+        stripe_business_price_id=_env("STRIPE_BUSINESS_PRICE_ID"),
+        stripe_enterprise_price_id=_env("STRIPE_ENTERPRISE_PRICE_ID"),
         upload_dir=_env("PLATFORM_UPLOAD_DIR") or ("/tmp/uploads" if os.environ.get("VERCEL") else ".tmp/uploads"),
     )

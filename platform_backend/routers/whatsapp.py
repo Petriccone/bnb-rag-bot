@@ -343,7 +343,9 @@ async def webhook_receive(request: Request):
                 response = get_agent_response(tenant_id, str(from_wa), text_body.strip(), is_audio=False, agent_id=agent_id)
                 reply_text = (response.get("resposta_texto") or "").strip()
                 if reply_text:
-                    await _send_whatsapp_text(phone_number_id, access_token, str(from_wa), reply_text)
+                    success = await _send_whatsapp_text(phone_number_id, access_token, str(from_wa), reply_text)
+                    if success:
+                        print(f"[Meta Webhook] Successfully processed and tracked message for tenant {tenant_id}")
     return {"ok": True}
 
 
@@ -443,11 +445,13 @@ async def evolution_webhook(request: Request):
         response = get_agent_response(tenant_id, remote_jid, text or "", is_audio=False, agent_id=config.get("agent_id"))
         reply_text = (response.get("resposta_texto") or "").strip()
         if reply_text:
-            await _send_evolution_text(
+            success = await _send_evolution_text(
                 config["base_url"],
                 config["api_key"],
                 config["instance_name"],
                 remote_jid,
                 reply_text,
             )
+            if success:
+                print(f"[Evolution Webhook] Successfully processed and tracked message for tenant {tenant_id}")
     return {"ok": True}

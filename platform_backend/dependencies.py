@@ -1,63 +1,16 @@
-"""
-Dependências FastAPI para injeção de tenant_id e autenticação.
-Este módulo fornece dependências para isolar dados por tenant.
-"""
-from typing import Annotated, Optional
-from fastapi import Depends, HTTPException, status, Header
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from typing import Optional, Annotated
 from pydantic import BaseModel
-import hashlib
-from datetime import datetime, timedelta
-
+from fastapi import Header, Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from .config import get_settings
+from .auth import decode_token, create_access_token, hash_password, verify_password
 
 
 # Security scheme
 bearer_scheme = HTTPBearer(auto_error=False)
 
 
-def _to_bcrypt_input(password: str) -> bytes:
-    """SHA-256 da senha (32 bytes) → bcrypt aceita sem limite de 72 bytes."""
-    return hashlib.sha256(password.encode("utf-8")).digest()
-
-
-def hash_password(password: str) -> str:
-    import bcrypt
-    return bcrypt.hashpw(_to_bcrypt_input(password), bcrypt.gensalt()).decode("ascii")
-
-
-def verify_password(plain: str, hashed: str) -> bool:
-    import bcrypt
-    return bcrypt.checkpw(_to_bcrypt_input(plain), hashed.encode("ascii"))
-
-
-def create_access_token(
-    data: dict,
-    expires_delta: Optional[timedelta] = None,
-    secret: Optional[str] = None,
-    algorithm: str = "HS256"
-) -> str:
-    """Cria token JWT com dados personalizados."""
-    from jose import jwt
-    if secret is None:
-        settings = get_settings()
-        secret = settings.jwt_secret
-    to_encode = data.copy()
-    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=get_settings().jwt_expire_minutes))
-    to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, secret, algorithm=algorithm)
-
-
-def decode_token(token: str, secret: Optional[str] = None, algorithm: str = "HS256") -> Optional[dict]:
-    """Decodifica e valida token JWT."""
-    from jose import JWTError, jwt
-    if secret is None:
-        settings = get_settings()
-        secret = settings.jwt_secret
-    try:
-        return jwt.decode(token, secret, algorithms=[algorithm])
-    except JWTError:
-        return None
+# Funções de hash e token movidas para .auth para evitar duplicidade
 
 
 class TenantContext(BaseModel):
@@ -86,6 +39,7 @@ async def get_current_user_optional(
     return {
         "user_id": payload["sub"],
         "tenant_id": payload.get("tenant_id"),
+        "role": payload.get("role", "company_user"),
         "plan": payload.get("plan", "free"),
         "email": payload.get("email"),
     }
@@ -130,6 +84,7 @@ async def get_current_user(
     return {
         "user_id": payload["sub"],
         "tenant_id": tenant_id,
+        "role": payload.get("role", "company_user"),
         "plan": payload.get("plan", "free"),
         "email": payload.get("email"),
     }
@@ -165,6 +120,15 @@ def require_plan(minimum_plan: str = "free") -> str:
             )
         return user_plan
     
+def require_role(allowed_roles: list[str]) -> str:
+    """Dependency factory: verifica se o usuário tem uma das roles permitidas."""
+    def checker(user: dict = Depends(get_current_user)) -> str:
+        if user.get("role") not in allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Permissão insuficiente"
+            )
+        return user["role"]
     return checker
 
 

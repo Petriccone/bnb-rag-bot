@@ -16,6 +16,7 @@ from .db_sessions import (
     update_state,
 )
 from .state_machine import apply_transition
+from . import plan_limit_checker
 
 
 def _drive_search(user_text: str, state: str) -> str:
@@ -92,9 +93,29 @@ def run_agent_facade(
         recent_log = [m for m in recent_log if m.get("role") == "user"]
 
     # Prefer overrides (ex.: API já carregou o agente com PLATFORM_DATABASE_URL); senão tenta get_agent_by_id (DATABASE_URL)
+    original_agent_id = agent_id
+
+    # --- AIOS SUPERVISOR ROUTING ---
+    if tenant_id:
+        try:
+            from .supervisor import route_conversation
+            routing_decision = route_conversation(tenant_id, user_text, recent_log, current_agent_id=agent_id)
+            if routing_decision.get("target_agent_id") and routing_decision.get("target_agent_id") != agent_id:
+                # Handoff occurred! Save context in shared memory
+                agent_id = routing_decision["target_agent_id"]
+                try:
+                    from .agent_memory import save_shared_memory
+                    summary = f"Supervisor routed the conversation to you because: {routing_decision.get('reason')}. Please assist the user."
+                    save_shared_memory(tenant_id, lead_id, original_agent_id, agent_id, summary)
+                except Exception as mem_err:
+                    print(f"Failed to write shared memory: {mem_err}")
+        except Exception as e:
+            print(f"Supervisor wrapper error: {e}")
+
     agent_name = agent_name_override
     agent_niche = agent_niche_override
     agent_prompt_custom = agent_prompt_custom_override
+    
     if agent_name is None and agent_niche is None and agent_prompt_custom is None and agent_id:
         try:
             from .tenant_config import get_agent_by_id
@@ -105,6 +126,13 @@ def run_agent_facade(
                 agent_prompt_custom = agent_info.get("prompt_custom")
         except Exception:
             pass
+
+    # --- PLAN LIMIT CHECK ---
+    if tenant_id and not plan_limit_checker.check_message_limit(tenant_id):
+        return {
+            "resposta_texto": "Limite de mensagens do seu plano atingido. Por favor, faça upgrade para continuar usando o serviço.",
+            "proximo_estado": current_state
+        }
 
     from .llm_orchestrator import run as llm_run
     out = llm_run(
@@ -117,6 +145,8 @@ def run_agent_facade(
         agent_name=agent_name,
         agent_niche=agent_niche,
         agent_prompt_custom=agent_prompt_custom,
+        tenant_id=tenant_id,
+        agent_id=agent_id,
     )
 
     resposta_texto = (out.get("resposta_texto") or "").strip()
@@ -130,6 +160,14 @@ def run_agent_facade(
 
     if new_state == "fechamento":
         update_classification(lead_id, "quente", tenant_id=tenant_id, agent_id=agent_id)
+
+    # Track usage if tenant is valid
+    if tenant_id:
+        try:
+            from .usage_tracker import track_message_sync
+            track_message_sync(tenant_id, tokens_used=0) # Token estimation could be added here
+        except Exception as e:
+            print(f"Error tracking message: {e}")
 
     return {
         "resposta_texto": resposta_texto,

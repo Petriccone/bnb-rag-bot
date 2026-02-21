@@ -73,21 +73,28 @@ def search_document_chunks(
         try:
             with conn.cursor() as cur:
                 if embedding_namespace:
+                    # Hybrid Search: Agent specific OR global tenant namespace
+                    global_namespace = f"tenant_{tenant_id}"
                     cur.execute(
                         """
                         SELECT dc.content FROM document_chunks dc
                         JOIN documents d ON d.id = dc.document_id AND d.tenant_id = dc.tenant_id
-                        WHERE dc.tenant_id = %s AND d.embedding_namespace = %s AND dc.embedding IS NOT NULL
+                        WHERE dc.tenant_id = %s 
+                          AND d.embedding_namespace IN (%s, %s) 
+                          AND dc.embedding IS NOT NULL 
+                          AND d.status = 'completed'
                         ORDER BY dc.embedding <=> %s::vector
                         LIMIT %s
                         """,
-                        (tenant_id, embedding_namespace, vec_str, limit),
+                        (tenant_id, embedding_namespace, global_namespace, vec_str, limit),
                     )
                 else:
+                    # No specific agent namespace requested, just fallback to global behavior
                     cur.execute(
                         """
                         SELECT dc.content FROM document_chunks dc
-                        WHERE dc.tenant_id = %s AND dc.embedding IS NOT NULL
+                        JOIN documents d ON d.id = dc.document_id AND d.tenant_id = dc.tenant_id
+                        WHERE dc.tenant_id = %s AND dc.embedding IS NOT NULL AND d.status = 'completed'
                         ORDER BY dc.embedding <=> %s::vector
                         LIMIT %s
                         """,

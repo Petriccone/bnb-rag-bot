@@ -112,10 +112,14 @@ def _get_telegram_error_message(token: str) -> str:
         return f"Erro ao falar com o Telegram: {e!s}"
 
 
-def _set_telegram_webhook(token: str, webhook_url: str) -> bool:
+def _set_telegram_webhook(token: str, webhook_url: str, secret_token: str) -> bool:
     import httpx
     try:
-        r = httpx.get(f"https://api.telegram.org/bot{token}/setWebhook", params={"url": webhook_url}, timeout=10.0)
+        r = httpx.get(
+            f"https://api.telegram.org/bot{token}/setWebhook",
+            params={"url": webhook_url, "secret_token": secret_token},
+            timeout=10.0
+        )
         return r.json().get("ok", False)
     except Exception:
         return False
@@ -241,7 +245,9 @@ async def telegram_connect(request: Request, user: dict = Depends(get_current_us
             detail="A conexão com o Telegram não está disponível no momento. O administrador da plataforma precisa configurar a URL pública do servidor.",
         )
     webhook_url = f"{TELEGRAM_WEBHOOK_BASE}/api/webhook/telegram/{tenant_id}"
-    if not _set_telegram_webhook(token, webhook_url):
+    
+    secret_token = str(tenant_id).replace("-", "")
+    if not _set_telegram_webhook(token, webhook_url, secret_token):
         err_msg = _get_telegram_error_message(token)
         raise HTTPException(status_code=502, detail=err_msg)
     enc = encrypt_token(token)
@@ -284,7 +290,9 @@ async def telegram_connect_with_file(
             detail="O administrador precisa configurar TELEGRAM_WEBHOOK_BASE_URL no servidor.",
         )
     webhook_url = f"{TELEGRAM_WEBHOOK_BASE}/api/webhook/telegram/{tenant_id}"
-    if not _set_telegram_webhook(token, webhook_url):
+    
+    secret_token = str(tenant_id).replace("-", "")
+    if not _set_telegram_webhook(token, webhook_url, secret_token):
         err_msg = _get_telegram_error_message(token)
         raise HTTPException(status_code=502, detail=err_msg)
     enc = encrypt_token(token)

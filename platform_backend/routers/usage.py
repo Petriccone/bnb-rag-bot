@@ -14,21 +14,35 @@ from ..db import get_cursor
 router = APIRouter(prefix="/usage", tags=["usage"])
 
 
-# Plan limits configuration
+# Plan limits configuration based on Euro pricing
 PLAN_LIMITS = {
     "free": {
+        "messages_limit": 100,
+        "tokens_limit": 50000,
+        "storage_limit_mb": 10,
+        "documents_limit": 2,
+        "agents_limit": 1,
+    },
+    "starter": {
         "messages_limit": 2000,
-        "tokens_limit": 100000,
+        "tokens_limit": 1000000,
         "storage_limit_mb": 50,
         "documents_limit": 10,
         "agents_limit": 3,
     },
-    "pro": {
+    "growth": {
         "messages_limit": 10000,
-        "tokens_limit": 500000,
+        "tokens_limit": 5000000,
         "storage_limit_mb": 500,
         "documents_limit": 50,
         "agents_limit": 10,
+    },
+    "business": {
+        "messages_limit": 50000,
+        "tokens_limit": 25000000,
+        "storage_limit_mb": 2000,
+        "documents_limit": 200,
+        "agents_limit": 50,
     },
     "enterprise": {
         "messages_limit": 0,  # 0 = unlimited
@@ -167,42 +181,17 @@ def track_message(
     user: CurrentUser = None,
     tenant_id: CurrentTenant = None,
 ):
-    """Registra uma mensagem enviada (para uso interno/automático)."""
-    month = _get_current_month()
-    
-    with get_cursor() as cur:
-        usage = _ensure_usage_record(tenant_id, cur)
+    """Registra uma mensagem enviada (API wrapper)."""
+    import sys
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[2]
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
         
-        # Verifica limite de mensagens
-        if usage["messages_limit"] > 0:
-            cur.execute(
-                """SELECT messages_used FROM tenant_usage WHERE tenant_id = %s AND year_month = %s""",
-                (tenant_id, month)
-            )
-            current = cur.fetchone()
-            if current and current["messages_used"] >= usage["messages_limit"]:
-                raise HTTPException(
-                    status_code=403,
-                    detail="Limite de mensagens do plano atingido"
-                )
-        
-        # Atualiza contadores
-        cur.execute(
-            """UPDATE tenant_usage 
-               SET messages_sent = messages_sent + 1, 
-                   tokens_used = tokens_used + %s,
-                   updated_at = NOW()
-               WHERE tenant_id = %s AND year_month = %s""",
-            (tokens_used, tenant_id, month)
-        )
-        
-        # Log
-        cur.execute(
-            """INSERT INTO tenant_usage_log (tenant_id, event_type, tokens)
-               VALUES (%s, 'message_sent', %s)""",
-            (tenant_id, tokens_used)
-        )
-    
+    from execution.usage_tracker import track_message_sync
+    success = track_message_sync(tenant_id, tokens_used)
+    if not success:
+         raise HTTPException(status_code=500, detail="Erro ao registrar consumo")
     return {"ok": True, "tokens_used": tokens_used}
 
 
@@ -212,39 +201,18 @@ def track_tokens(
     user: CurrentUser = None,
     tenant_id: CurrentTenant = None,
 ):
-    """Registra tokens usados (para uso interno/automático)."""
-    month = _get_current_month()
-    
-    with get_cursor() as cur:
-        usage = _ensure_usage_record(tenant_id, cur)
+    """Registra tokens usados."""
+    # Apenas um alias para as mensagens agora, já que a tracking sync faz as duas.
+    import sys
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[2]
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
         
-        # Verifica limite de tokens
-        if usage["tokens_limit"] > 0:
-            cur.execute(
-                """SELECT tokens_used FROM tenant_usage WHERE tenant_id = %s AND year_month = %s""",
-                (tenant_id, month)
-            )
-            current = cur.fetchone()
-            if current and current["tokens_used"] + tokens > usage["tokens_limit"]:
-                raise HTTPException(
-                    status_code=403,
-                    detail="Limite de tokens do plano atingido"
-                )
-        
-        cur.execute(
-            """UPDATE tenant_usage 
-               SET tokens_used = tokens_used + %s,
-                   updated_at = NOW()
-               WHERE tenant_id = %s AND year_month = %s""",
-            (tokens, tenant_id, month)
-        )
-        
-        cur.execute(
-            """INSERT INTO tenant_usage_log (tenant_id, event_type, tokens)
-               VALUES (%s, 'token_used', %s)""",
-            (tenant_id, tokens)
-        )
-    
+    from execution.usage_tracker import track_message_sync
+    success = track_message_sync(tenant_id, tokens)
+    if not success:
+         raise HTTPException(status_code=500, detail="Erro ao registrar consumo")
     return {"ok": True, "tokens_added": tokens}
 
 
@@ -255,43 +223,24 @@ def track_storage(
     user: CurrentUser = None,
     tenant_id: CurrentTenant = None,
 ):
-    """Registra uso de storage (para uso interno/automático)."""
-    month = _get_current_month()
-    mb_delta = bytes_delta / (1024 * 1024)
+    """Registra uso de storage."""
+    import sys
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[2]
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+        
+    from execution.usage_tracker import track_storage_sync
+    result = track_storage_sync(tenant_id, bytes_delta, event_type)
     
-    with get_cursor() as cur:
-        usage = _ensure_usage_record(tenant_id, cur)
-        
-        # Verifica limite de storage
-        if usage["storage_limit_mb"] > 0:
-            cur.execute(
-                """SELECT storage_mb FROM tenant_usage WHERE tenant_id = %s AND year_month = %s""",
-                (tenant_id, month)
-            )
-            current = cur.fetchone()
-            new_storage = (current["storage_mb"] if current else 0) + mb_delta
-            if new_storage > usage["storage_limit_mb"]:
-                raise HTTPException(
-                    status_code=403,
-                    detail="Limite de storage do plano atingido"
-                )
-        
-        storage_change = mb_delta if event_type == "document_uploaded" else -mb_delta
-        cur.execute(
-            """UPDATE tenant_usage 
-               SET storage_mb = storage_mb + %s,
-                   updated_at = NOW()
-               WHERE tenant_id = %s AND year_month = %s""",
-            (storage_change, tenant_id, month)
-        )
-        
-        cur.execute(
-            """INSERT INTO tenant_usage_log (tenant_id, event_type, storage_bytes)
-               VALUES (%s, %s, %s)""",
-            (tenant_id, event_type, bytes_delta)
+    if not result.get("ok"):
+        raise HTTPException(
+            status_code=403,
+            detail=result.get("error", "Erro ao registrar consumo storage")
         )
     
-    return {"ok": True, "storage_delta_mb": mb_delta}
+    return {"ok": True, "storage_delta_mb": result.get("storage_delta_mb")}
+
 
 
 @router.get("/logs", response_model=list[UsageLogResponse])

@@ -1,74 +1,97 @@
-# Instruções do Agente
+# AGENTS.md - Synkra AIOS (Codex CLI)
 
-	⁠Este arquivo é espelhado em CLAUDE.md, AGENTS.md e GEMINI.md, então as mesmas instruções carregam em qualquer ambiente de IA.
+Este arquivo define as instrucoes do projeto para o Codex CLI.
 
-Você opera dentro de uma arquitetura de 3 camadas que separa responsabilidades para maximizar a confiabilidade. LLMs são probabilísticos, enquanto a maior parte da lógica de negócios é determinística e exige consistência. Este sistema resolve esse descompasso.
+<!-- AIOS-MANAGED-START: core -->
+## Core Rules
+
+1. Siga a Constitution em `.aios-core/constitution.md`
+2. Priorize `CLI First -> Observability Second -> UI Third`
+3. Trabalhe por stories em `docs/stories/`
+4. Nao invente requisitos fora dos artefatos existentes
+<!-- AIOS-MANAGED-END: core -->
+
+<!-- AIOS-MANAGED-START: quality -->
+## Quality Gates
+
+- Rode `npm run lint`
+- Rode `npm run typecheck`
+- Rode `npm test`
+- Atualize checklist e file list da story antes de concluir
+<!-- AIOS-MANAGED-END: quality -->
+
+<!-- AIOS-MANAGED-START: codebase -->
+## Project Map
+
+- Core framework: `.aios-core/`
+- CLI entrypoints: `bin/`
+- Shared packages: `packages/`
+- Tests: `tests/`
+- Docs: `docs/`
+<!-- AIOS-MANAGED-END: codebase -->
+
+<!-- AIOS-MANAGED-START: commands -->
+## Common Commands
+
+- `npm run sync:ide`
+- `npm run sync:ide:check`
+- `npm run sync:skills:codex`
+- `npm run sync:skills:codex:global` (opcional; neste repo o padrao e local-first)
+- `npm run validate:structure`
+- `npm run validate:agents`
+<!-- AIOS-MANAGED-END: commands -->
+
+<!-- AIOS-MANAGED-START: shortcuts -->
+## Agent Shortcuts
+
+Preferencia de ativacao no Codex CLI:
+1. Use `/skills` e selecione `aios-<agent-id>` vindo de `.codex/skills` (ex.: `aios-architect`)
+2. Se preferir, use os atalhos abaixo (`@architect`, `/architect`, etc.)
+
+Interprete os atalhos abaixo carregando o arquivo correspondente em `.aios-core/development/agents/` (fallback: `.codex/agents/`), renderize o greeting via `generate-greeting.js` e assuma a persona ate `*exit`:
+
+- `@architect`, `/architect`, `/architect.md` -> `.aios-core/development/agents/architect.md`
+- `@dev`, `/dev`, `/dev.md` -> `.aios-core/development/agents/dev.md`
+- `@qa`, `/qa`, `/qa.md` -> `.aios-core/development/agents/qa.md`
+- `@pm`, `/pm`, `/pm.md` -> `.aios-core/development/agents/pm.md`
+- `@po`, `/po`, `/po.md` -> `.aios-core/development/agents/po.md`
+- `@sm`, `/sm`, `/sm.md` -> `.aios-core/development/agents/sm.md`
+- `@analyst`, `/analyst`, `/analyst.md` -> `.aios-core/development/agents/analyst.md`
+- `@devops`, `/devops`, `/devops.md` -> `.aios-core/development/agents/devops.md`
+- `@data-engineer`, `/data-engineer`, `/data-engineer.md` -> `.aios-core/development/agents/data-engineer.md`
+- `@ux-design-expert`, `/ux-design-expert`, `/ux-design-expert.md` -> `.aios-core/development/agents/ux-design-expert.md`
+- `@squad-creator`, `/squad-creator`, `/squad-creator.md` -> `.aios-core/development/agents/squad-creator.md`
+- `@aios-master`, `/aios-master`, `/aios-master.md` -> `.aios-core/development/agents/aios-master.md`
+<!-- AIOS-MANAGED-END: shortcuts -->
+
+---
+
+# Existing Architecture & Principles (Restored)
+
+Questo projeto segue uma arquitetura de 3 camadas para maximizar a confiabilidade e separação de responsabilidades.
 
 ## Arquitetura de 3 Camadas
 
 ### Camada 1: Diretiva (O que fazer)
-•⁠  ⁠Basicamente são SOPs escritos em Markdown, que vivem em ⁠ directives/ ⁠
-•⁠  ⁠Definem objetivos, entradas, ferramentas/scripts a usar, saídas e edge cases
-•⁠  ⁠Instruções em linguagem natural, como você daria a um funcionário de nível intermediário
+• SOPs escritos em Markdown em `directives/`
+• Definem objetivos, entradas, ferramentas/scripts, saídas e edge cases.
 
 ### Camada 2: Orquestração (Tomada de decisão)
-•⁠  ⁠É você. Sua função: roteamento inteligente.
-•⁠  ⁠Ler diretivas, chamar ferramentas de execução na ordem correta, lidar com erros, pedir esclarecimentos, atualizar diretivas com aprendizados
-•⁠  ⁠Você é a ponte entre intenção e execução. Exemplo: você não tenta fazer scraping manualmente — você lê ⁠ directives/scrape_website.md ⁠, formula entradas/saídas e então roda ⁠ execution/scrape_single_site.py ⁠
+• Função: roteamento inteligente.
+• Ler diretivas, chamar ferramentas de execução, lidar com erros, pedir esclarecimentos.
 
 ### Camada 3: Execução (Fazer o trabalho)
-•⁠  ⁠Scripts determinísticos em Python dentro de ⁠ execution/ ⁠
-•⁠  ⁠Variáveis de ambiente, tokens de API etc vivem no ⁠ .env ⁠
-•⁠  ⁠Lida com chamadas de API, processamento de dados, operações de arquivos, interações com banco de dados
-•⁠  ⁠Confiável, testável, rápido. Use scripts em vez de fazer tudo manualmente. Bem comentado.
-
-## Por que isso funciona?
-Se você tentar fazer tudo sozinho, seus erros se acumulam. Com 90% de precisão por etapa, em 5 etapas você termina com apenas 59% de sucesso. A solução é empurrar a complexidade para o código determinístico. Dessa forma, você foca apenas na tomada de decisão.
+• Scripts determinísticos em Python em `execution/`
+• Lida com chamadas de API, processamento de dados, banco de dados.
 
 ## Princípios de Operação
 
-### 1. Verifique ferramentas primeiro
-Antes de escrever um novo script, verifique ⁠ execution/ ⁠ seguindo a diretiva. Só crie novos scripts se realmente não existirem.
-
-### 2. Auto-aperfeiçoamento quando algo quebrar (self-anneal)
-•⁠  ⁠Leia a mensagem de erro e o stack trace
-•⁠  ⁠Corrija o script e teste novamente (exceto se ele consumir créditos pagos — nesse caso consulte o usuário primeiro)
-•⁠  ⁠Atualize a diretiva com os aprendizados (limites de API, tempos, edge cases)
-•⁠  ⁠Exemplo: atingiu limite de API → você pesquisa → encontra endpoint batch → reescreve script → testa → atualiza diretiva
-
-### 3. Atualize diretivas conforme aprende
-As diretivas são documentos vivos. Quando descobrir limitações de API, melhores abordagens, erros comuns, expectativas de tempo — atualize. Mas não crie novas diretivas sem permissão e não sobrescreva diretivas existentes sem o usuário pedir. Elas são seu conjunto de instruções e devem ser preservadas.
+1. **Verifique ferramentas primeiro**: Antes de escrever um novo script, verifique `execution/`.
+2. **Auto-aperfeiçoamento (self-anneal)**: Leia mensagens de erro, corrija scripts e atualize diretivas.
+3. **Atualize diretivas conforme aprende**: Mantenha as diretivas como documentos vivos.
 
 ## Loop de Self-Annealing
-Erros são oportunidades de fortalecimento do sistema. Quando algo quebrar:
-1.⁠ ⁠Conserte
-2.⁠ ⁠Atualize a ferramenta
-3.⁠ ⁠Teste a ferramenta e confirme que funciona
-4.⁠ ⁠Atualize a diretiva com o novo fluxo
-5.⁠ ⁠O sistema fica mais forte
-
-## Organização de Arquivos
-
-### Deliverables vs Intermediários
-•⁠  ⁠Deliverables: Google Sheets, Google Slides ou outros arquivos na nuvem que o usuário acessa
-•⁠  ⁠Intermediários: arquivos temporários durante o processamento
-
-### Estrutura de diretórios
-.tmp/           # Arquivos intermediários (sempre regeneráveis)
-execution/      # Scripts Python determinísticos
-directives/     # SOPs em Markdown
-.env            # Variáveis de ambiente e APIs
-credentials.json
-token.json      # Credenciais de OAuth para Google (no .gitignore)
-
-### Princípio chave
-Arquivos locais servem apenas para processamento. Deliverables vivem na nuvem. Tudo em ⁠ .tmp/ ⁠ pode ser apagado a qualquer momento.
-
-### 4. Sandbox antes de produção
-•⁠  ⁠Existe ambiente de sandbox (branch ⁠ develop⁠  + Preview na Vercel). Ver ⁠ docs/AMBIENTE_SANDBOX_STAGING.md⁠ .
-•⁠  ⁠Fluxo preferido: fazer commit e ⁠ push para ⁠ develop⁠  (não para ⁠ main⁠ ). Isso atualiza só o preview/sandbox.
-•⁠  ⁠Sugerir ao usuário testar no link do preview (Vercel → Deployments → deploy do branch ⁠ develop⁠ ) antes de fazer merge para ⁠ main⁠  e push em ⁠ main⁠ .
-•⁠  ⁠Só recomendar “merge para main e push” (ou “subir para produção”) quando o usuário tiver validado no sandbox ou pedir explicitamente para atualizar o site oficial.
-
-## Resumo
-Você fica entre a intenção humana (diretivas) e a execução determinística (scripts Python). Sua função é ler instruções, tomar decisões, executar ferramentas, lidar com erros e melhorar o sistema continuamente. Seja pragmático. Seja confiável. Auto-aperfeiçoe sempre.
+1. Conserte o erro.
+2. Atualize a ferramenta.
+3. Teste e confirme.
+4. Atualize a diretiva com o novo fluxo.

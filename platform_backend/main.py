@@ -8,6 +8,8 @@ import os
 import traceback
 from contextlib import asynccontextmanager
 from pathlib import Path
+
+# Force uvicorn reload
 try:
     from dotenv import load_dotenv
     env_path = Path(__file__).resolve().parent.parent / ".env"
@@ -38,6 +40,7 @@ usage = _safe_import("usage")
 whatsapp = _safe_import("whatsapp")
 telegram = _safe_import("telegram")
 telegram_webhook = _safe_import("telegram_webhook")
+billing = _safe_import("billing")
 
 
 def _normalize_api_path(raw: str) -> str:
@@ -110,6 +113,8 @@ if telegram:
     app.include_router(telegram, prefix="/api")
 if telegram_webhook:
     app.include_router(telegram_webhook, prefix="/api/webhook/telegram")
+if billing:
+    app.include_router(billing, prefix="/api")
 
 
 @app.get("/")

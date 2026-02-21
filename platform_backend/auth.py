@@ -34,8 +34,25 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     settings = get_settings()
     to_encode = data.copy()
     expire = datetime.utcnow() + (expires_delta or timedelta(minutes=settings.jwt_expire_minutes))
-    to_encode.update({"exp": expire})
+    # data deve conter: sub (user_id), tenant_id, role, plan
+    to_encode.update({"exp": expire, "type": "access"})
     return jwt.encode(to_encode, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+
+
+def create_refresh_token(user_id: str) -> str:
+    import secrets
+    from jose import jwt
+    settings = get_settings()
+    token = secrets.token_urlsafe(64)
+    expire = datetime.utcnow() + timedelta(days=settings.jwt_refresh_expire_days)
+    # Payload do refresh token é mínimo
+    payload = {
+        "sub": user_id,
+        "exp": expire,
+        "type": "refresh",
+        "jti": secrets.token_hex(8)
+    }
+    return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
 def decode_token(token: str) -> Optional[dict]:
@@ -57,6 +74,12 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     payload = decode_token(credentials.credentials)
-    if not payload or "sub" not in payload:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido")
-    return {"user_id": payload["sub"], "tenant_id": payload.get("tenant_id")}
+    if not payload or "sub" not in payload or payload.get("type") != "access":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido ou expirado")
+    
+    return {
+        "user_id": payload["sub"], 
+        "tenant_id": payload.get("tenant_id"),
+        "role": payload.get("role", "company_user"),
+        "plan": payload.get("plan", "free")
+    }

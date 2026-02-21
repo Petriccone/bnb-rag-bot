@@ -4,7 +4,7 @@ Métricas por tenant (mensagens, leads, conversas).
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
-from ..auth import get_current_user
+from ..dependencies import get_current_user
 from ..db import get_cursor
 
 router = APIRouter(prefix="/metrics", tags=["metrics"])

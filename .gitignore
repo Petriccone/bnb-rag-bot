@@ -1,14 +1,15 @@
-# Segredos e credenciais
+# Secrets & Credentials
 .env
+.env.local
+.env.*.local
 token.json
 credentials.json
+*.key
+*.pem
 
-# Banco e cache (regeneráveis)
-.tmp/*.db
-.tmp/drive_cache.txt
-.tmp/tts_output.mp3
-.tmp/voice_*
-.tmp/logs/
+# Temp & Cache
+.tmp/
+uploads/
 
 # Python
 __pycache__/
@@ -16,3 +17,26 @@ __pycache__/
 .venv/
 venv/
 env/
+
+# Node
+node_modules/
+
+# Build & Logs
+dist/
+build/
+.next/
+*.log
+logs/
+
+# IDE & OS
+.DS_Store
+Thumbs.db
+.idea/
+.cursor/
+.claude/
+.codex/
+.aios-core/
+*.swp
+
+# Antigravity / Gemini
+.gemini/

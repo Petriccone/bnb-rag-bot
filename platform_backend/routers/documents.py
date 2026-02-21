@@ -5,7 +5,7 @@ Suporta: PDF, Excel (.xlsx, .xls), Word (.docx), CSV, Markdown, HTML, URLs.
 import os
 import uuid
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, BackgroundTasks
 from pydantic import BaseModel
 
 from ..dependencies import get_current_user
@@ -71,6 +71,7 @@ def list_documents(user: dict = Depends(get_current_user)):
 
 @router.post("/upload", response_model=DocumentResponse)
 async def upload_document(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     embedding_namespace: Optional[str] = None,
     user: dict = Depends(get_current_user),
@@ -92,7 +93,7 @@ async def upload_document(
             pass
     # #endregion
     try:
-        return await _upload_document_impl(file, embedding_namespace, user, _debug_log)
+        return await _upload_document_impl(file, embedding_namespace, user, _debug_log, background_tasks)
     except HTTPException:
         raise
     except Exception as e:
@@ -100,7 +101,7 @@ async def upload_document(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-async def _upload_document_impl(file, embedding_namespace, user, _debug_log):
+async def _upload_document_impl(file, embedding_namespace, user, _debug_log, background_tasks: BackgroundTasks):
     tenant_id = _ensure_tenant(user)
     # #region agent log
     _debug_log("upload_document entry", {"tenant_id": tenant_id, "filename": file.filename}, "A")
@@ -149,89 +150,34 @@ async def _upload_document_impl(file, embedding_namespace, user, _debug_log):
         # #endregion
         raise
 
-    # Inicia processamento (ingestão para base de conhecimento)
-    if doc_id and ext in {".txt", ".pdf", ".xlsx", ".xls", ".docx", ".csv", ".md", ".html"}:
-        try:
-            import sys
-            from pathlib import Path
-            root = Path(__file__).resolve().parents[2]
-            if str(root) not in sys.path:
-                sys.path.insert(0, str(root))
-            
-            # Importa e executa ingestão
-            from execution.document_ingest_extended import (
-                _extract_text_from_file,
-                _chunk_text,
-            )
-            from execution.knowledge_rag import _embed
-            
-            # Extrai texto
-            text = _extract_text_from_file(file_path)
-            chunks = _chunk_text(text)
-            
-            if chunks:
-                # Gera embeddings
-                embeddings = _embed(chunks)
-                
-                # Insere chunks no banco
-                from execution.document_ingest import _get_connection
-                conn = _get_connection()
-                try:
-                    with conn.cursor() as cur:
-                        for i, (content_chunk, emb) in enumerate(zip(chunks, embeddings)):
-                            vec_str = "[" + ",".join(str(x) for x in emb) + "]"
-                            cur.execute(
-                                """INSERT INTO document_chunks (tenant_id, document_id, chunk_index, content, embedding)
-                                   VALUES (%s, %s, %s, %s, %s::vector)""",
-                                (tenant_id, doc_id, i, content_chunk, vec_str),
-                            )
-                    conn.commit()
-                    
-                    # Atualiza status (opcional se coluna não existir)
-                    try:
-                        with get_cursor() as cur:
-                            cur.execute(
-                                "UPDATE documents SET status = 'completed' WHERE id = %s",
-                                (doc_id,)
-                            )
-                    except Exception:
-                        pass
-                finally:
-                    conn.close()
-            else:
-                try:
-                    with get_cursor() as cur:
-                        cur.execute(
-                            "UPDATE documents SET status = 'completed' WHERE id = %s",
-                            (doc_id,)
-                        )
-                except Exception:
-                    pass
-        except Exception as e:
-            try:
-                with get_cursor() as cur:
-                    cur.execute(
-                        "UPDATE documents SET status = 'failed' WHERE id = %s",
-                        (doc_id,)
-                    )
-            except Exception:
-                pass
+    # Launch background processing
+    if doc_id:
+        background_tasks.add_task(
+            process_document_task,
+            doc_id=doc_id,
+            file_path=file_path,
+            tenant_id=tenant_id,
+            embedding_namespace=namespace,
+            file_name=file.filename,
+            file_type=ext[1:]
+        )
 
     return DocumentResponse(
         id=doc_id,
         tenant_id=str(row["tenant_id"]),
         file_path=row["file_path"],
-        file_name=row.get("file_name") or file.filename or (os.path.basename(row["file_path"]) if row.get("file_path") else "file"),
-        file_size_mb=float(row.get("file_size_mb") or file_size_mb),
-        file_type=row.get("file_type") or ext[1:] or "unknown",
+        file_name=file.filename or row.get("file_name") or "file",
+        file_size_mb=float(file_size_mb),
+        file_type=ext[1:] or row.get("file_type") or "unknown",
         embedding_namespace=row.get("embedding_namespace") or namespace,
         source_url=row.get("source_url"),
-        status=row.get("status") or "pending",
+        status="pending",
     )
 
 
 @router.post("/url", response_model=DocumentResponse)
 async def upload_from_url(
+    background_tasks: BackgroundTasks,
     request: URLDocumentRequest,
     user: dict = Depends(get_current_user),
 ):
@@ -287,64 +233,28 @@ async def upload_from_url(
         row = cur.fetchone()
         doc_id = str(row["id"])
 
-    # Processa similar ao upload
+    # Launch background processing
     if doc_id:
-        try:
-            from execution.document_ingest_extended import (
-                _extract_text_from_file,
-                _chunk_text,
-            )
-            from execution.knowledge_rag import _embed
-            
-            text = _extract_text_from_file(file_path)
-            chunks = _chunk_text(text)
-            
-            if chunks:
-                embeddings = _embed(chunks)
-                
-                from execution.document_ingest import _get_connection
-                conn = _get_connection()
-                try:
-                    with conn.cursor() as cur:
-                        for i, (content_chunk, emb) in enumerate(zip(chunks, embeddings)):
-                            vec_str = "[" + ",".join(str(x) for x in emb) + "]"
-                            cur.execute(
-                                """INSERT INTO document_chunks (tenant_id, document_id, chunk_index, content, embedding)
-                                   VALUES (%s, %s, %s, %s, %s::vector)""",
-                                (tenant_id, doc_id, i, content_chunk, vec_str),
-                            )
-                    conn.commit()
-                    
-                    try:
-                        with get_cursor() as cur:
-                            cur.execute(
-                                "UPDATE documents SET status = 'completed' WHERE id = %s",
-                                (doc_id,)
-                            )
-                    except Exception:
-                        pass
-                finally:
-                    conn.close()
-        except Exception as e:
-            try:
-                with get_cursor() as cur:
-                    cur.execute(
-                        "UPDATE documents SET status = 'failed' WHERE id = %s",
-                        (doc_id,)
-                    )
-            except Exception:
-                pass
+        background_tasks.add_task(
+            process_document_task,
+            doc_id=doc_id,
+            file_path=file_path,
+            tenant_id=tenant_id,
+            embedding_namespace=namespace,
+            file_name=row.get("file_name") or request.url.split("/")[-1] or "webpage",
+            file_type=ext[1:]
+        )
 
     return DocumentResponse(
         id=doc_id,
         tenant_id=str(row["tenant_id"]),
         file_path=row["file_path"],
         file_name=row.get("file_name") or request.url.split("/")[-1] or "webpage",
-        file_size_mb=float(row.get("file_size_mb") or file_size_mb),
-        file_type=row.get("file_type") or ext[1:] or "unknown",
+        file_size_mb=float(file_size_mb),
+        file_type=ext[1:] or "unknown",
         embedding_namespace=row.get("embedding_namespace") or namespace,
         source_url=row.get("source_url") or request.url,
-        status=row.get("status") or "pending",
+        status="pending",
     )
 
 
@@ -405,3 +315,91 @@ def get_document_status(document_id: str, user: dict = Depends(get_current_user)
         "file_name": row["file_name"],
         "file_type": row["file_type"],
     }
+
+
+class DocumentRenameRequest(BaseModel):
+    file_name: str
+
+
+@router.patch("/{document_id}")
+def rename_document(document_id: str, request: DocumentRenameRequest, user: dict = Depends(get_current_user)):
+    """Renomeia o arquivo na base de dados (apenas o display name visual)."""
+    tenant_id = _ensure_tenant(user)
+    if not request.file_name or not request.file_name.strip():
+        raise HTTPException(status_code=400, detail="Nome do arquivo não pode ser vazio")
+        
+    with get_cursor() as cur:
+        cur.execute(
+            "UPDATE documents SET file_name = %s WHERE id = %s AND tenant_id = %s RETURNING id",
+            (request.file_name.strip(), document_id, tenant_id)
+        )
+        row = cur.fetchone()
+        
+    if not row:
+        raise HTTPException(status_code=404, detail="Documento não encontrado")
+        
+    return {"ok": True, "file_name": request.file_name.strip()}
+
+# --- BACKGROUND WORKER ---
+
+def process_document_task(doc_id: str, file_path: str, tenant_id: str, embedding_namespace: str, file_name: str, file_type: str):
+    """Worker de segundo plano para processar documentos (extração + embedding)."""
+    import sys
+    from pathlib import Path
+    
+    # Atualiza status inicial
+    try:
+        with get_cursor() as cur:
+            cur.execute(
+                "UPDATE documents SET status = 'processing', file_name = %s, file_type = %s, file_size_mb = %s WHERE id = %s",
+                (file_name, file_type, os.path.getsize(file_path) / (1024 * 1024), doc_id)
+            )
+    except Exception:
+        pass
+
+    try:
+        root = Path(__file__).resolve().parents[2]
+        if str(root) not in sys.path:
+            sys.path.insert(0, str(root))
+        
+        from execution.document_ingest_extended import _extract_text_from_file, _chunk_text
+        from execution.knowledge_rag import _embed
+        from execution.document_ingest import _get_connection
+
+        # Extração
+        text = _extract_text_from_file(file_path)
+        chunks = _chunk_text(text)
+        
+        if not chunks:
+            with get_cursor() as cur:
+                cur.execute("UPDATE documents SET status = 'completed' WHERE id = %s", (doc_id,))
+            return
+
+        # Embeddings
+        embeddings = _embed(chunks)
+        
+        # Salvamento
+        conn = _get_connection()
+        try:
+            with conn.cursor() as cur:
+                for i, (content_chunk, emb) in enumerate(zip(chunks, embeddings)):
+                    vec_str = "[" + ",".join(str(x) for x in emb) + "]"
+                    cur.execute(
+                        """INSERT INTO document_chunks (tenant_id, document_id, chunk_index, content, embedding)
+                           VALUES (%s, %s, %s, %s, %s::vector)""",
+                        (tenant_id, doc_id, i, content_chunk, vec_str),
+                    )
+            conn.commit()
+            
+            with get_cursor() as cur:
+                cur.execute("UPDATE documents SET status = 'completed' WHERE id = %s", (doc_id,))
+        finally:
+            conn.close()
+
+    except Exception as e:
+        print(f"Error processing document {doc_id}: {e}")
+        try:
+            with get_cursor() as cur:
+                cur.execute("UPDATE documents SET status = 'failed' WHERE id = %s", (doc_id,))
+        except Exception:
+            pass

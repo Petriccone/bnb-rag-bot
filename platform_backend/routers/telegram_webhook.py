@@ -198,13 +198,21 @@ def _send_telegram_voice(token: str, chat_id: int, voice_path: str) -> bool:
 
 @router.post("/{tenant_id}")
 async def telegram_webhook_receive(tenant_id: str, request: Request):
-    """Recebe o update do Telegram (POST com JSON). Processa na mesma requisição para funcionar na Vercel (serverless mata a execução ao retornar)."""
+    """Recebe o update do Telegram (POST com JSON). Processa na mesma requisição e valida a origem."""
+    # Valida Segurança
+    secret_token = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
+    expected_token = str(tenant_id).replace("-", "")
+    if secret_token != expected_token:
+        # Se falhar a validação silenciosamente e evitar erro (pode ser bot scan)
+        return JSONResponse(content={"ok": False, "error": "Unauthorized"}, status_code=401)
+        
     try:
         body = await request.json()
     except Exception:
         raise HTTPException(status_code=400, detail="Body inválido")
     try:
         _process_telegram_update(tenant_id, body)
-    except Exception:
+    except Exception as e:
+        print(f"Error processing telegram webhook for tenant {tenant_id}: {e}")
         pass  # Telegram já recebe 200; falhas não devem derrubar o webhook
     return JSONResponse(content={"ok": True}, status_code=200)

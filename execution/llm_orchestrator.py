@@ -33,6 +33,24 @@ def _get_client() -> OpenAI:
     )
 
 
+def call_llm(messages: list[dict], model_override: str | None = None, temperature: float = 0.5, stream: bool = False) -> str:
+    """Helper genérico para chamar o LLM via OpenRouter."""
+    client = _get_client()
+    model = model_override or os.environ.get("OPENROUTER_MODEL", "openai/gpt-4o-mini")
+    
+    response = client.chat.completions.create(
+        model=model,
+        messages=messages,
+        temperature=temperature,
+        stream=stream
+    )
+    
+    if stream:
+        return response # Retorna o generator
+    
+    return response.choices[0].message.content or ""
+
+
 # Arquivos de diretiva que mencionam filtro/água e são ignorados quando o agente tem persona customizada
 _DIRECTIVES_WITH_FILTER_PRODUCT = frozenset({
     "sdr_personalidade.md",
@@ -180,6 +198,8 @@ def run(
     agent_name: str | None = None,
     agent_niche: str | None = None,
     agent_prompt_custom: str | None = None,
+    tenant_id: str | None = None,
+    agent_id: str | None = None,
 ) -> dict[str, Any]:
     """
     Executa uma rodada do orquestrador.
@@ -192,6 +212,19 @@ def run(
         agent_niche=agent_niche,
         agent_prompt_custom=agent_prompt_custom,
     )
+    
+    # --- AIOS SHARED MEMORY ---
+    shared_memory_prompt = ""
+    if tenant_id and agent_id:
+        try:
+            from .agent_memory import build_shared_memory_prompt
+            shared_memory_prompt = build_shared_memory_prompt(tenant_id, user_id, agent_id)
+        except Exception as e:
+            print(f"Error loading shared memory: {e}")
+            
+    if shared_memory_prompt:
+        system = shared_memory_prompt + "\n" + system
+
     user_content = build_user_message(user_message, rag_context, recent_log)
 
     client = _get_client()

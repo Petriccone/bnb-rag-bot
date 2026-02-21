@@ -4,7 +4,7 @@ Dados do tenant (empresa) do usuário logado.
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from ..auth import get_current_user
+from ..dependencies import get_current_user, require_role
 from ..db import get_cursor
 
 router = APIRouter(prefix="/tenants", tags=["tenants"])
@@ -47,7 +47,7 @@ class TenantPlanUpdate(BaseModel):
     plan: str
 
 
-@router.patch("/me")
+@router.patch("/me", dependencies=[Depends(require_role(["company_admin", "platform_admin"]))])
 def update_tenant_settings(body: TenantSettingsUpdate, user: dict = Depends(get_current_user)):
     tenant_id = user.get("tenant_id")
     if not tenant_id:
@@ -61,7 +61,7 @@ def update_tenant_settings(body: TenantSettingsUpdate, user: dict = Depends(get_
     return {"ok": True}
 
 
-@router.patch("/me/plan")
+@router.patch("/me/plan", dependencies=[Depends(require_role(["platform_admin"]))])
 def update_tenant_plan(body: TenantPlanUpdate, user: dict = Depends(get_current_user)):
     """Atualiza o plano do tenant (para uso admin/billing)."""
     tenant_id = user.get("tenant_id")
