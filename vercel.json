@@ -1,15 +1,13 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "platform_backend/main.py",
-      "use": "@vercel/python"
-    }
-  ],
+  "framework": "nextjs",
+  "buildCommand": "cd frontend_dashboard && npm install && npm run build",
+  "outputDirectory": "frontend_dashboard/.next",
+  "installCommand": "cd frontend_dashboard && npm install",
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "platform_backend/main.py"
+      "dest": "/"
     }
   ]
 }
