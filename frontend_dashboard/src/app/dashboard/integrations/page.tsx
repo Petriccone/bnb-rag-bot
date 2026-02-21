@@ -42,7 +42,7 @@ export default function IntegrationsPage() {
                 else setTgStatus({ connected: false, message: 'Erro ao buscar status do Telegram' });
             } catch (err: any) { setTgStatus({ connected: false, message: 'Offline: ' + err.message }); }
             try {
-                const agRes = await apiClient.get('/agents/');
+                const agRes = await apiClient.get('/agents');
                 setAgents(agRes.data || []);
                 if (agRes.data?.length > 0) setSelectedAgentId(agRes.data[0].id);
             } catch { /* offline */ }

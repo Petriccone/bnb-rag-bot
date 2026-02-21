@@ -3,11 +3,19 @@ import axios from 'axios';
 // Get base URL depending on environment
 const getBaseUrl = () => {
     let url = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
-    // Ensure the URL ends with /api if it's a vercel URL
-    if (url.includes('vercel.app') && !url.endsWith('/api')) {
-        url = url.endsWith('/') ? `${url}api` : `${url}/api`;
-        return url;
+
+    // Normalize: Ensure it ends with /api if it's a Vercel URL
+    if (url.includes('vercel.app')) {
+        if (!url.includes('/api')) {
+            url = url.endsWith('/') ? `${url}api` : `${url}/api`;
+        }
     }
+
+    // Strip final slash from the base URL itself if present
+    if (url.endsWith('/')) {
+        url = url.slice(0, -1);
+    }
+
     return url;
 };
 
@@ -21,6 +29,12 @@ export const apiClient = axios.create({
 // Add a request interceptor to inject the token
 apiClient.interceptors.request.use(
     (config) => {
+        // Systemic fix: Strip trailing slashes from endpoints to avoid 307 redirects (FastAPI)
+        // Redirects often break CORS on Vercel.
+        if (config.url && config.url.length > 1 && config.url.endsWith('/')) {
+            config.url = config.url.slice(0, -1);
+        }
+
         // If running in browser, get token from localStorage
         if (typeof window !== 'undefined') {
             const token = localStorage.getItem('access_token');
