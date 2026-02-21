@@ -108,6 +108,32 @@ export default function TeamPage() {
         }
     };
 
+    const handleToggleLeader = async (agentId: string) => {
+        if (!managingTeam) return;
+        setAssignLoading(true);
+        try {
+            const isRemoving = managingTeam.settings?.leader_agent_id === agentId;
+            const newSettings = {
+                ...(managingTeam.settings || {}),
+                leader_agent_id: isRemoving ? null : agentId
+            };
+
+            await apiClient.patch(`/teams/${managingTeam.id}`, { settings: newSettings });
+
+            // Update local state
+            setTeams(prev => prev.map(t =>
+                t.id === managingTeam.id ? { ...t, settings: newSettings } : t
+            ));
+            setManagingTeam(prev => prev ? { ...prev, settings: newSettings } : null);
+        } catch (error) {
+            alert('Erro ao definir líder');
+        } finally {
+            setAssignLoading(true); // Wait for fetchData to be sure
+            await fetchData();
+            setAssignLoading(false);
+        }
+    };
+
     const openCreateModal = () => {
         setEditingTeam(null);
         setTeamForm({ name: '', description: '' });
@@ -186,6 +212,13 @@ export default function TeamPage() {
                                         {team.agents_count}
                                     </span>
                                 </div>
+
+                                {team.settings?.leader_agent_id && (
+                                    <div className="mb-3 flex items-center gap-1.5 text-xs font-medium text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded">
+                                        <Shield className="w-3 h-4" />
+                                        <span>Líder: {agents.find(a => a.id === team.settings.leader_agent_id)?.name || 'Agente não encontrado'}</span>
+                                    </div>
+                                )}
 
                                 <div className="space-y-2 mb-4">
                                     {agents.filter(a => a.team_id === team.id).slice(0, 3).map(agent => (
@@ -299,19 +332,32 @@ export default function TeamPage() {
                                                     )}
                                                 </div>
                                             </div>
-                                            <button
-                                                disabled={AssignLoading}
-                                                onClick={() => handleToggleAgentTeam(agent.id, isInThisTeam)}
-                                                className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${isInThisTeam
+                                            <div className="flex items-center gap-2">
+                                                {isInThisTeam && (
+                                                    <button
+                                                        onClick={() => handleToggleLeader(agent.id)}
+                                                        className={`p-2 rounded-full transition-colors ${agent.id === managingTeam.settings?.leader_agent_id
+                                                            ? 'text-amber-500 bg-amber-100 dark:bg-amber-900/40'
+                                                            : 'text-gray-300 hover:text-amber-400'}`}
+                                                        title={agent.id === managingTeam.settings?.leader_agent_id ? "Remover Líder" : "Definir como Líder"}
+                                                    >
+                                                        <Shield className={`w-5 h-5 ${agent.id === managingTeam.settings?.leader_agent_id ? 'fill-current' : ''}`} />
+                                                    </button>
+                                                )}
+                                                <button
+                                                    disabled={AssignLoading}
+                                                    onClick={() => handleToggleAgentTeam(agent.id, isInThisTeam)}
+                                                    className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${isInThisTeam
                                                         ? 'bg-blue-600 border-blue-600 text-white hover:bg-red-600 hover:border-red-600 hover:text-white group relative'
                                                         : 'bg-white dark:bg-[#1f2937] border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-blue-500 hover:text-blue-600 dark:hover:text-blue-400'
-                                                    }`}
-                                            >
-                                                {isInThisTeam ? (
-                                                    <span className="group-hover:hidden">Membro</span>
-                                                ) : 'Adicionar'}
-                                                {isInThisTeam && <span className="hidden group-hover:inline">Remover</span>}
-                                            </button>
+                                                        }`}
+                                                >
+                                                    {isInThisTeam ? (
+                                                        <span className="group-hover:hidden">Membro</span>
+                                                    ) : 'Adicionar'}
+                                                    {isInThisTeam && <span className="hidden group-hover:inline">Remover</span>}
+                                                </button>
+                                            </div>
                                         </li>
                                     );
                                 })}
