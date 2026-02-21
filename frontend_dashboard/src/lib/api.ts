@@ -2,15 +2,13 @@ import axios from 'axios';
 
 // Get base URL depending on environment
 const getBaseUrl = () => {
-    if (typeof window !== 'undefined') {
-        // We are running in the browser, call the same host, but hit the /api route
-        // If backend is running on a different port, define NEXT_PUBLIC_API_URL
-        return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+    let url = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+    // Ensure the URL ends with /api if it's a vercel URL
+    if (url.includes('vercel.app') && !url.endsWith('/api')) {
+        url = url.endsWith('/') ? `${url}api` : `${url}/api`;
+        return url;
     }
-
-    // We are running on the server (Server Components)
-    // Docker / local dev -> usually same host.
-    return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+    return url;
 };
 
 export const apiClient = axios.create({
