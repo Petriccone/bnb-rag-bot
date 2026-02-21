@@ -36,6 +36,7 @@ class AgentCreate(BaseModel):
     niche: str | None = None
     prompt_custom: str | None = None
     embedding_namespace: str | None = None
+    team_id: str | None = None
     settings: dict | None = {}
 
 
@@ -45,6 +46,7 @@ class AgentUpdate(BaseModel):
     prompt_custom: str | None = None
     active: bool | None = None
     embedding_namespace: str | None = None
+    team_id: str | None = None
     settings: dict | None = None
 
 
@@ -56,6 +58,7 @@ class AgentResponse(BaseModel):
     prompt_custom: str | None
     active: bool
     embedding_namespace: str | None = None
+    team_id: str | None = None
     settings: dict = {}
 
 
@@ -119,6 +122,7 @@ def _row_to_agent(r: dict) -> AgentResponse:
         prompt_custom=r.get("prompt_custom"),
         active=r["active"],
         embedding_namespace=r.get("embedding_namespace"),
+        team_id=str(r["team_id"]) if r.get("team_id") else None,
         settings=r.get("settings") or {},
     )
 
@@ -128,7 +132,7 @@ def list_agents(user: dict = Depends(get_current_user)):
     tenant_id = _ensure_tenant(user)
     with get_cursor() as cur:
         cur.execute(
-            "SELECT * FROM agents WHERE tenant_id = %s ORDER BY created_at",
+            "SELECT id, tenant_id, name, niche, prompt_custom, active, embedding_namespace, settings, team_id FROM agents WHERE tenant_id = %s ORDER BY created_at",
             (tenant_id,),
         )
         rows = cur.fetchall()
@@ -148,18 +152,18 @@ def create_agent(body: AgentCreate, user: dict = Depends(get_current_user)):
     try:
         with get_cursor() as cur:
             cur.execute(
-                """INSERT INTO agents (tenant_id, name, niche, prompt_custom, active, embedding_namespace, settings)
-                   VALUES (%s, %s, %s, %s, true, %s, %s) RETURNING *""",
-                (tenant_id, body.name, body.niche or "", body.prompt_custom or "", body.embedding_namespace or None, settings_json),
+                """INSERT INTO agents (tenant_id, name, niche, prompt_custom, active, embedding_namespace, team_id, settings)
+                   VALUES (%s, %s, %s, %s, true, %s, %s, %s) RETURNING *""",
+                (tenant_id, body.name, body.niche or "", body.prompt_custom or "", body.embedding_namespace or None, body.team_id, settings_json),
             )
             row = cur.fetchone()
     except Exception as e:
         if "embedding_namespace" in str(e) and "does not exist" in str(e).lower():
             with get_cursor() as cur:
                 cur.execute(
-                    """INSERT INTO agents (tenant_id, name, niche, prompt_custom, active, settings)
-                       VALUES (%s, %s, %s, %s, true, %s) RETURNING *""",
-                    (tenant_id, body.name, body.niche or "", body.prompt_custom or "", settings_json),
+                    """INSERT INTO agents (tenant_id, name, niche, prompt_custom, active, team_id, settings)
+                       VALUES (%s, %s, %s, %s, true, %s, %s) RETURNING *""",
+                    (tenant_id, body.name, body.niche or "", body.prompt_custom or "", body.team_id, settings_json),
                 )
                 row = cur.fetchone()
         else:
@@ -172,7 +176,7 @@ def get_agent(agent_id: UUID, user: dict = Depends(get_current_user)):
     tenant_id = _ensure_tenant(user)
     with get_cursor() as cur:
         cur.execute(
-            "SELECT * FROM agents WHERE id = %s AND tenant_id = %s",
+            "SELECT id, tenant_id, name, niche, prompt_custom, active, embedding_namespace, settings, team_id FROM agents WHERE id = %s AND tenant_id = %s",
             (str(agent_id), tenant_id),
         )
         row = cur.fetchone()
@@ -186,7 +190,7 @@ def update_agent(agent_id: UUID, body: AgentUpdate, user: dict = Depends(get_cur
     tenant_id = _ensure_tenant(user)
     with get_cursor() as cur:
         cur.execute(
-            "SELECT * FROM agents WHERE id = %s AND tenant_id = %s",
+            "SELECT id, tenant_id, name, niche, prompt_custom, active, embedding_namespace, settings, team_id FROM agents WHERE id = %s AND tenant_id = %s",
             (str(agent_id), tenant_id),
         )
         row = cur.fetchone()
@@ -197,6 +201,8 @@ def update_agent(agent_id: UUID, body: AgentUpdate, user: dict = Depends(get_cur
     prompt_custom = body.prompt_custom if body.prompt_custom is not None else row["prompt_custom"]
     active = body.active if body.active is not None else row["active"]
     embedding_namespace = body.embedding_namespace if body.embedding_namespace is not None else row.get("embedding_namespace")
+    team_id_val = body.team_id if body.team_id is not None else str(row.get("team_id")) if row.get("team_id") else None
+    if team_id_val == "": team_id_val = None
     import json
     new_settings = body.settings if body.settings is not None else row.get("settings", {})
     settings_json = json.dumps(new_settings)
@@ -204,18 +210,18 @@ def update_agent(agent_id: UUID, body: AgentUpdate, user: dict = Depends(get_cur
     try:
         with get_cursor() as cur:
             cur.execute(
-                """UPDATE agents SET name = %s, niche = %s, prompt_custom = %s, active = %s, embedding_namespace = %s, settings = %s, updated_at = NOW()
+                """UPDATE agents SET name = %s, niche = %s, prompt_custom = %s, active = %s, embedding_namespace = %s, team_id = %s, settings = %s, updated_at = NOW()
                    WHERE id = %s AND tenant_id = %s RETURNING *""",
-                (name, niche, prompt_custom, active, embedding_namespace, settings_json, str(agent_id), tenant_id),
+                (name, niche, prompt_custom, active, embedding_namespace, team_id_val, settings_json, str(agent_id), tenant_id),
             )
             row = cur.fetchone()
     except Exception as e:
         if "embedding_namespace" in str(e) and "does not exist" in str(e).lower():
             with get_cursor() as cur:
                 cur.execute(
-                    """UPDATE agents SET name = %s, niche = %s, prompt_custom = %s, active = %s, settings = %s, updated_at = NOW()
+                    """UPDATE agents SET name = %s, niche = %s, prompt_custom = %s, active = %s, team_id = %s, settings = %s, updated_at = NOW()
                        WHERE id = %s AND tenant_id = %s RETURNING *""",
-                    (name, niche, prompt_custom, active, settings_json, str(agent_id), tenant_id),
+                    (name, niche, prompt_custom, active, team_id_val, settings_json, str(agent_id), tenant_id),
                 )
                 row = cur.fetchone()
         else:

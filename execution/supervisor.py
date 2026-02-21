@@ -15,9 +15,10 @@ SUPERVISOR_MODELS = [
     "google/gemini-flash-1.5"
 ]
 
-def _get_tenant_agents(tenant_id: str, allowed_ids: list[str] | None = None) -> list[dict]:
+def _get_tenant_agents(tenant_id: str, allowed_ids: list[str] | None = None, team_id: str | None = None) -> list[dict]:
     """Retorna a lista de agentes ativos disponíveis no tenant.
     Se allowed_ids for fornecido, filtra apenas esses agentes (para can_delegate_to).
+    Se team_id for fornecido, filtra apenas agentes daquela equipe.
     """
     if not _use_postgres():
         return []
@@ -26,10 +27,13 @@ def _get_tenant_agents(tenant_id: str, allowed_ids: list[str] | None = None) -> 
     agents = []
     try:
         with conn.cursor() as cur:
-            cur.execute(
-                "SELECT id, name, niche, prompt_custom, settings FROM agents WHERE tenant_id = %s AND active = true",
-                (tenant_id,)
-            )
+            query = "SELECT id, name, niche, prompt_custom, settings FROM agents WHERE tenant_id = %s AND active = true"
+            params = [tenant_id]
+            if team_id:
+                query += " AND team_id = %s"
+                params.append(team_id)
+                
+            cur.execute(query, tuple(params))
             rows = cur.fetchall()
             for r in rows:
                 agent_id = str(r["id"])
@@ -77,24 +81,45 @@ def _get_agent_settings(tenant_id: str, agent_id: str) -> dict:
         conn.close()
 
 
+def _get_agent_team_id(tenant_id: str, agent_id: str) -> str | None:
+    """Busca o team_id do agente atual."""
+    if not _use_postgres():
+        return None
+    conn = _get_pg_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT team_id FROM agents WHERE id = %s AND tenant_id = %s", (agent_id, tenant_id))
+            row = cur.fetchone()
+            if row and row["team_id"]:
+                return str(row["team_id"])
+        return None
+    except Exception:
+        return None
+    finally:
+        conn.close()
+
+
 def route_conversation(tenant_id: str, user_message: str, recent_log: list[dict], current_agent_id: str | None = None) -> dict:
     """
     Roteador do AIOS: Analisa a conversa e retorna o id do agente que deve responder.
     Respeita can_delegate_to nos settings do agente atual.
     Retorna {"target_agent_id": UUID, "reason": str}
     """
-    # Se há um agente atual, verifica se ele tem can_delegate_to configurado
     allowed_ids: list[str] | None = None
+    team_id: str | None = None
     if current_agent_id and tenant_id:
         settings = _get_agent_settings(tenant_id, current_agent_id)
         can_delegate_to = settings.get("can_delegate_to")
         if isinstance(can_delegate_to, list) and len(can_delegate_to) > 0:
             allowed_ids = [str(aid) for aid in can_delegate_to]
         else:
-            # Sem configuração de delegação → não roteia
-            return {"target_agent_id": current_agent_id, "reason": "No delegation configured for this agent"}
+            # Fallback para roteamento de equipe inteira
+            team_id = _get_agent_team_id(tenant_id, current_agent_id)
+            if not team_id:
+                # Sem configuração de delegação ativa e fora de equipe -> não roteia
+                return {"target_agent_id": current_agent_id, "reason": "No delegation or team configured for this agent"}
 
-    agents = _get_tenant_agents(tenant_id, allowed_ids=allowed_ids)
+    agents = _get_tenant_agents(tenant_id, allowed_ids=allowed_ids, team_id=team_id)
 
     # Se só houver 1 agente ou nenhum (além do atual), não há o que rotear
     callable_agents = [a for a in agents if a["id"] != current_agent_id]

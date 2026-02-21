@@ -42,6 +42,7 @@ telegram = _safe_import("telegram")
 telegram_webhook = _safe_import("telegram_webhook")
 billing = _safe_import("billing")
 widget = _safe_import("widget")
+teams = _safe_import("teams")
 
 
 def _normalize_api_path(raw: str) -> str:
@@ -66,7 +67,7 @@ class VercelPathFixMiddleware(BaseHTTPMiddleware):
             if any(path.startswith(x) for x in (
                 "/auth", "/webhook", "/tenants", "/agents", 
                 "/documents", "/metrics", "/docs", 
-                "/whatsapp", "/telegram", "/billing", "/widget"
+                "/whatsapp", "/telegram", "/billing", "/widget", "/teams"
             )):
                 request.scope["path"] = "/api" + path
         return await call_next(request)
@@ -122,6 +123,8 @@ if billing:
     app.include_router(billing, prefix="/api")
 if widget:
     app.include_router(widget, prefix="/api")
+if teams:
+    app.include_router(teams, prefix="/api")
 
 
 @app.get("/")

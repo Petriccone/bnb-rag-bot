@@ -2,184 +2,330 @@
 
 import React, { useState, useEffect } from 'react';
 import { useI18n } from '@/lib/i18n-context';
-import { Users, Shield, Trash2, Clock, AlertCircle, GripVertical } from 'lucide-react';
+import { Users, Plus, Trash2, Edit2, Shield, Settings2, UserPlus, Loader2, Bot } from 'lucide-react';
 import { apiClient } from '@/lib/api';
 
-type MemberStatus = 'Pending' | 'Active' | 'Inactive';
-
-interface TeamMember {
-    id: number;
+interface Team {
+    id: string;
     name: string;
-    email: string;
-    role: string;
-    status: MemberStatus;
+    description: string;
+    agents_count: number;
+    settings: any;
+}
+
+interface Agent {
+    id: string;
+    name: string;
+    niche: string;
+    team_id: string | null;
 }
 
 export default function TeamPage() {
     const { t } = useI18n();
-    const [members, setMembers] = useState<TeamMember[]>([]);
+    const [teams, setTeams] = useState<Team[]>([]);
+    const [agents, setAgents] = useState<Agent[]>([]);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
-    const [draggedItem, setDraggedItem] = useState<number | null>(null);
+
+    // Modal states
+    const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
+    const [editingTeam, setEditingTeam] = useState<Team | null>(null);
+    const [teamForm, setTeamForm] = useState({ name: '', description: '' });
+    const [isSaving, setIsSaving] = useState(false);
+
+    // Agents assignment modal states
+    const [isAgentsModalOpen, setIsAgentsModalOpen] = useState(false);
+    const [managingTeam, setManagingTeam] = useState<Team | null>(null);
+    const [AssignLoading, setAssignLoading] = useState(false);
 
     useEffect(() => {
-        fetchMembers();
+        fetchData();
     }, []);
 
-    const fetchMembers = async () => {
+    const fetchData = async () => {
         try {
-            // Simulated for now if endpoint doesn't exist.
-            // When real endpoint is ready, map the backend status to 'Pending' | 'Active' | 'Inactive'
-            setMembers([
-                { id: 1, name: 'Admin User', email: 'admin@botfy.ai', role: 'Admin', status: 'Active' },
-                { id: 2, name: 'Support Agent', email: 'support@botfy.ai', role: 'Agent', status: 'Active' },
-                { id: 3, name: 'New Hire', email: 'newhire@botfy.ai', role: 'Viewer', status: 'Pending' },
-                { id: 4, name: 'Old Agent', email: 'old@botfy.ai', role: 'Agent', status: 'Inactive' }
+            setLoading(true);
+            const [teamsRes, agentsRes] = await Promise.all([
+                apiClient.get('/teams'),
+                apiClient.get('/agents')
             ]);
-        } catch (err) {
-            setError('Failed to load team members');
+            setTeams(teamsRes.data);
+            setAgents(agentsRes.data);
+        } catch (error) {
+            console.error('Error fetching teams:', error);
+            // Fallback for demo
         } finally {
             setLoading(false);
         }
     };
 
-    // --- Drag and Drop Handlers ---
-    const handleDragStart = (e: React.DragEvent, id: number) => {
-        setDraggedItem(id);
-        e.dataTransfer.effectAllowed = 'move';
-        // Make the drag image slightly transparent
-        if (e.target instanceof HTMLElement) {
-            e.target.style.opacity = '0.5';
-        }
-    };
-
-    const handleDragEnd = (e: React.DragEvent) => {
-        setDraggedItem(null);
-        if (e.target instanceof HTMLElement) {
-            e.target.style.opacity = '1';
-        }
-    };
-
-    const handleDragOver = (e: React.DragEvent) => {
-        e.preventDefault(); // Necessary to allow dropping
-        e.dataTransfer.dropEffect = 'move';
-    };
-
-    const handleDrop = async (e: React.DragEvent, newStatus: MemberStatus) => {
+    const handleSaveTeam = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (draggedItem === null) return;
-
-        // Optimistically update UI
-        setMembers(prev => prev.map(m =>
-            m.id === draggedItem ? { ...m, status: newStatus } : m
-        ));
-
-        // TODO: Call backend to update member status
-        // try {
-        //     await apiClient.patch(`/tenants/members/${draggedItem}`, { status: newStatus });
-        // } catch (err) {
-        //     // Revert on failure
-        //     fetchMembers();
-        // }
+        setIsSaving(true);
+        try {
+            if (editingTeam) {
+                await apiClient.patch(`/teams/${editingTeam.id}`, teamForm);
+            } else {
+                await apiClient.post('/teams', teamForm);
+            }
+            await fetchData();
+            setIsTeamModalOpen(false);
+        } catch (error) {
+            alert('Erro ao salvar equipe');
+        } finally {
+            setIsSaving(false);
+        }
     };
 
-    // --- Columns Definition ---
-    const columns: { id: MemberStatus; title: string; icon: React.ReactNode; color: string }[] = [
-        { id: 'Pending', title: 'Convite Pendente', icon: <Clock className="w-4 h-4" />, color: 'bg-yellow-50 dark:bg-yellow-900/10 border-yellow-200 dark:border-yellow-900/30' },
-        { id: 'Active', title: 'Ativos', icon: <Users className="w-4 h-4" />, color: 'bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-900/30' },
-        { id: 'Inactive', title: 'Bloqueados / Inativos', icon: <AlertCircle className="w-4 h-4" />, color: 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-900/30' }
-    ];
+    const handleDeleteTeam = async (teamId: string) => {
+        if (!confirm('Tem certeza que deseja excluir esta equipe? Os agentes não serão excluídos, apenas removidos da equipe.')) return;
+        try {
+            await apiClient.delete(`/teams/${teamId}`);
+            await fetchData();
+        } catch (error) {
+            alert('Erro ao excluir equipe');
+        }
+    };
+
+    const handleToggleAgentTeam = async (agentId: string, isInTeam: boolean) => {
+        if (!managingTeam) return;
+        setAssignLoading(true);
+        try {
+            const newTeamId = isInTeam ? null : managingTeam.id;
+            await apiClient.patch(`/agents/${agentId}`, { team_id: newTeamId });
+            // Optimistic UI update
+            setAgents(prev => prev.map(a => a.id === agentId ? { ...a, team_id: newTeamId } : a));
+            // Update team count optimistically
+            setTeams(prev => prev.map(t =>
+                t.id === managingTeam.id
+                    ? { ...t, agents_count: t.agents_count + (isInTeam ? -1 : 1) }
+                    : t
+            ));
+        } catch (error) {
+            alert('Erro ao atualizar agente');
+            await fetchData(); // Revert on error
+        } finally {
+            setAssignLoading(false);
+        }
+    };
+
+    const openCreateModal = () => {
+        setEditingTeam(null);
+        setTeamForm({ name: '', description: '' });
+        setIsTeamModalOpen(true);
+    };
+
+    const openEditModal = (team: Team) => {
+        setEditingTeam(team);
+        setTeamForm({ name: team.name, description: team.description || '' });
+        setIsTeamModalOpen(true);
+    };
+
+    const openAgentsModal = (team: Team) => {
+        setManagingTeam(team);
+        setIsAgentsModalOpen(true);
+    };
 
     if (loading) {
-        return <div className="p-8 text-center text-gray-500">Carregando equipe...</div>;
+        return <div className="p-8 text-center text-gray-500 flex justify-center"><Loader2 className="w-8 h-8 animate-spin" /></div>;
     }
 
     return (
-        <div className="max-w-7xl mx-auto h-[calc(100vh-8rem)] flex flex-col">
-            <div className="mb-6 flex-shrink-0">
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white transition-colors duration-200">{t.navTeam || 'Equipe'}</h1>
-                <p className="text-gray-500 dark:text-gray-400 mt-1 transition-colors duration-200">Arraste os membros entre as colunas para alterar o status de acesso deles.</p>
+        <div className="max-w-7xl mx-auto space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Equipes de Agentes</h1>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                        Agrupe seus agentes de IA em departamentos ou fluxos de atendimento específicos (Ex: Vendas, Suporte).
+                    </p>
+                </div>
+                <button
+                    onClick={openCreateModal}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2"
+                >
+                    <Plus className="w-4 h-4" />
+                    Nova Equipe
+                </button>
             </div>
 
-            {/* Kanban Board */}
-            <div className="flex-1 flex gap-6 overflow-x-auto pb-4">
-                {columns.map(col => (
-                    <div
-                        key={col.id}
-                        className={`flex flex-col w-80 rounded-xl border flex-shrink-0 ${col.color} bg-opacity-50 dark:bg-opacity-50`}
-                        onDragOver={handleDragOver}
-                        onDrop={(e) => handleDrop(e, col.id)}
-                    >
-                        {/* Column Header */}
-                        <div className="p-4 border-b border-inherit flex items-center justify-between">
-                            <div className="flex items-center gap-2 font-semibold text-gray-700 dark:text-gray-200">
-                                {col.icon}
-                                {col.title}
-                            </div>
-                            <span className="bg-white dark:bg-[#1f2937] text-gray-500 dark:text-gray-400 text-xs font-bold px-2 py-1 rounded-full shadow-sm">
-                                {members.filter(m => m.status === col.id).length}
-                            </span>
-                        </div>
-
-                        {/* Column Content (Cards) */}
-                        <div className="flex-1 p-3 flex flex-col gap-3 overflow-y-auto min-h-[150px]">
-                            {members.filter(m => m.status === col.id).map(member => (
-                                <div
-                                    key={member.id}
-                                    draggable
-                                    onDragStart={(e) => handleDragStart(e, member.id)}
-                                    onDragEnd={handleDragEnd}
-                                    className="bg-white dark:bg-[#1f2937] border border-gray-200 dark:border-gray-700/60 p-4 rounded-lg shadow-sm cursor-grab active:cursor-grabbing hover:shadow-md hover:border-blue-300 dark:hover:border-blue-500/50 transition-all group"
-                                >
-                                    <div className="flex justify-between items-start mb-3">
-                                        <div className="flex items-center gap-3 overflow-hidden">
-                                            <div className="flex-shrink-0 flex items-center justify-center cursor-grab">
-                                                <GripVertical className="w-4 h-4 text-gray-300 dark:text-gray-600 group-hover:text-gray-400 dark:group-hover:text-gray-500 transition-colors" />
-                                            </div>
-                                            <div className="h-9 w-9 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-blue-700 dark:text-blue-400 font-bold flex-shrink-0 border border-transparent dark:border-blue-800/50">
-                                                {member.name.charAt(0).toUpperCase()}
-                                            </div>
-                                            <div className="min-w-0">
-                                                <h3 className="text-sm font-semibold text-gray-900 dark:text-white truncate" title={member.name}>
-                                                    {member.name}
-                                                </h3>
-                                                <p className="text-xs text-gray-500 dark:text-gray-400 truncate" title={member.email}>
-                                                    {member.email}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex items-center justify-between mt-2 pt-3 border-t border-gray-100 dark:border-gray-700/50 pl-6">
-                                        <div className="flex items-center gap-1.5 px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded text-[10px] font-medium text-gray-600 dark:text-gray-300">
-                                            <Shield className="w-3 h-3" />
-                                            {member.role}
-                                        </div>
-                                        <button
-                                            className="text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 transition-colors p-1 rounded"
-                                            title="Remover Membro"
-                                            onClick={(e) => {
-                                                e.stopPropagation(); // Prevent drag interference
-                                                // Handle delete
-                                                setMembers(prev => prev.filter(m => m.id !== member.id));
-                                            }}
-                                        >
-                                            <Trash2 className="w-3.5 h-3.5" />
+            {teams.length === 0 ? (
+                <div className="bg-white dark:bg-[#111827] border border-gray-200 dark:border-[#1f2937] rounded-xl p-12 text-center">
+                    <Users className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Nenhuma equipe criada</h3>
+                    <p className="text-gray-500 dark:text-gray-400 mb-6">Comece criando sua primeira equipe para organizar seus agentes de IA.</p>
+                    <button onClick={openCreateModal} className="text-blue-600 hover:text-blue-700 font-medium">
+                        + Criar primeira equipe
+                    </button>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {teams.map(team => (
+                        <div key={team.id} className="bg-white dark:bg-[#111827] border border-gray-200 dark:border-[#1f2937] rounded-xl overflow-hidden hover:shadow-md transition-shadow">
+                            <div className="p-5 border-b border-gray-100 dark:border-[#1f2937]">
+                                <div className="flex justify-between items-start mb-2">
+                                    <h3 className="text-lg font-bold text-gray-900 dark:text-white truncate pr-2" title={team.name}>{team.name}</h3>
+                                    <div className="flex items-center gap-1 -mt-1 -mr-1">
+                                        <button onClick={() => openEditModal(team)} className="p-1.5 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors rounded">
+                                            <Edit2 className="w-4 h-4" />
+                                        </button>
+                                        <button onClick={() => handleDeleteTeam(team.id)} className="p-1.5 text-gray-400 hover:text-red-500 transition-colors rounded">
+                                            <Trash2 className="w-4 h-4" />
                                         </button>
                                     </div>
                                 </div>
-                            ))}
+                                <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2 h-10">
+                                    {team.description || 'Sem descrição'}
+                                </p>
+                            </div>
 
-                            {/* Empty state zone to make dropping easier when column is empty */}
-                            {members.filter(m => m.status === col.id).length === 0 && (
-                                <div className="flex-1 flex items-center justify-center border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg text-gray-400 dark:text-gray-500 text-sm">
-                                    Solte um card aqui
+                            <div className="bg-gray-50 dark:bg-[#0b0e14] p-4">
+                                <div className="flex items-center justify-between mb-3">
+                                    <span className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                                        Agentes na equipe
+                                    </span>
+                                    <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs font-bold px-2 py-0.5 rounded-full">
+                                        {team.agents_count}
+                                    </span>
                                 </div>
-                            )}
+
+                                <div className="space-y-2 mb-4">
+                                    {agents.filter(a => a.team_id === team.id).slice(0, 3).map(agent => (
+                                        <div key={agent.id} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-[#1f2937] border border-gray-200 dark:border-gray-700 px-3 py-2 rounded-md">
+                                            <Bot className="w-4 h-4 text-blue-500 shrink-0" />
+                                            <span className="truncate">{agent.name}</span>
+                                        </div>
+                                    ))}
+                                    {team.agents_count > 3 && (
+                                        <div className="text-xs text-center text-gray-500">
+                                            + {team.agents_count - 3} agentes ocultos
+                                        </div>
+                                    )}
+                                    {team.agents_count === 0 && (
+                                        <div className="text-sm text-center text-gray-400 dark:text-gray-500 py-2 border border-dashed border-gray-300 dark:border-gray-700 rounded-md">
+                                            Equipe vazia
+                                        </div>
+                                    )}
+                                </div>
+
+                                <button
+                                    onClick={() => openAgentsModal(team)}
+                                    className="w-full bg-white dark:bg-[#1f2937] border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center justify-center gap-2"
+                                >
+                                    <UserPlus className="w-4 h-4" />
+                                    Gerenciar Agentes
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* Create/Edit Team Modal */}
+            {isTeamModalOpen && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white dark:bg-[#1f2937] rounded-xl w-full max-w-md overflow-hidden shadow-xl">
+                        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-[#111827]">
+                            <h3 className="font-bold text-lg text-gray-900 dark:text-white">
+                                {editingTeam ? 'Editar Equipe' : 'Nova Equipe'}
+                            </h3>
+                            <button onClick={() => setIsTeamModalOpen(false)} className="text-gray-400 hover:text-gray-500">×</button>
+                        </div>
+                        <form onSubmit={handleSaveTeam} className="p-6">
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nome da Equipe</label>
+                                    <input
+                                        required
+                                        type="text"
+                                        className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-[#0b0e14] text-gray-900 dark:text-white"
+                                        value={teamForm.name}
+                                        onChange={e => setTeamForm({ ...teamForm, name: e.target.value })}
+                                        placeholder="Ex: Equipe de Vendas"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Descrição</label>
+                                    <textarea
+                                        className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-[#0b0e14] text-gray-900 dark:text-white h-24 resize-none"
+                                        value={teamForm.description}
+                                        onChange={e => setTeamForm({ ...teamForm, description: e.target.value })}
+                                        placeholder="Descreva o propósito desta equipe..."
+                                    />
+                                </div>
+                            </div>
+                            <div className="mt-6 flex justify-end gap-3">
+                                <button type="button" onClick={() => setIsTeamModalOpen(false)} className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium">Cancelar</button>
+                                <button type="submit" disabled={isSaving} className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 flex items-center gap-2">
+                                    {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+                                    Salvar
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Manage Agents Modal */}
+            {isAgentsModalOpen && managingTeam && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white dark:bg-[#1f2937] rounded-xl w-full max-w-2xl overflow-hidden shadow-xl flex flex-col max-h-[90vh]">
+                        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-[#111827]">
+                            <div>
+                                <h3 className="font-bold text-lg text-gray-900 dark:text-white">Gerenciar Agentes</h3>
+                                <p className="text-sm text-gray-500">Equipe: <span className="font-semibold text-blue-600">{managingTeam.name}</span></p>
+                            </div>
+                            <button onClick={() => setIsAgentsModalOpen(false)} className="text-gray-400 hover:text-gray-500 text-2xl leading-none">×</button>
+                        </div>
+
+                        <div className="p-0 overflow-y-auto flex-1 bg-gray-50/50 dark:bg-[#0b0e14]">
+                            <ul className="divide-y divide-gray-200 dark:divide-gray-800">
+                                {agents.map(agent => {
+                                    const isInThisTeam = agent.team_id === managingTeam.id;
+                                    const isInOtherTeam = agent.team_id && agent.team_id !== managingTeam.id;
+                                    const otherTeamName = isInOtherTeam ? teams.find(t => t.id === agent.team_id)?.name : null;
+
+                                    return (
+                                        <li key={agent.id} className={`p-4 flex items-center justify-between transition-colors ${isInThisTeam ? 'bg-blue-50/50 dark:bg-blue-900/10' : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'}`}>
+                                            <div className="flex items-center gap-4">
+                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isInThisTeam ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-400' : 'bg-gray-200 text-gray-500 dark:bg-gray-700 dark:text-gray-400'}`}>
+                                                    <Bot className="w-5 h-5" />
+                                                </div>
+                                                <div>
+                                                    <p className="font-semibold text-gray-900 dark:text-white">{agent.name}</p>
+                                                    <p className="text-xs text-gray-500 dark:text-gray-400">{agent.niche || 'Geral'}</p>
+                                                    {isInOtherTeam && (
+                                                        <p className="text-xs text-orange-600 dark:text-orange-400 mt-0.5">
+                                                            Atualmente na equipe: {otherTeamName}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <button
+                                                disabled={AssignLoading}
+                                                onClick={() => handleToggleAgentTeam(agent.id, isInThisTeam)}
+                                                className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${isInThisTeam
+                                                        ? 'bg-blue-600 border-blue-600 text-white hover:bg-red-600 hover:border-red-600 hover:text-white group relative'
+                                                        : 'bg-white dark:bg-[#1f2937] border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-blue-500 hover:text-blue-600 dark:hover:text-blue-400'
+                                                    }`}
+                                            >
+                                                {isInThisTeam ? (
+                                                    <span className="group-hover:hidden">Membro</span>
+                                                ) : 'Adicionar'}
+                                                {isInThisTeam && <span className="hidden group-hover:inline">Remover</span>}
+                                            </button>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        </div>
+
+                        <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-[#1f2937] flex justify-end">
+                            <button onClick={() => setIsAgentsModalOpen(false)} className="px-5 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg font-medium transition-colors">
+                                Concluir
+                            </button>
                         </div>
                     </div>
-                ))}
-            </div>
+                </div>
+            )}
         </div>
     );
 }
