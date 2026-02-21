@@ -123,22 +123,27 @@ if teams:
 
 
 @app.get("/")
+@app.get("/api")
+@app.get("/api/")
 def root():
     """Rota raiz: evita 404 ao abrir a URL da API no navegador."""
     return {
         "message": "B&B RAG Platform API",
         "docs": "/docs",
-        "health": "/health",
+        "health": "/api/health",
         "api": "/api",
+        "import_errors": "/api/import-error"
     }
 
 
 @app.get("/health")
+@app.get("/api/health")
 def health():
     return {"status": "ok"}
 
 
 @app.get("/import-error")
+@app.get("/api/import-error")
 def import_error():
     """Diagnóstico: lista routers que falharam no import (para debug na Vercel)."""
     return {"errors": _import_errors}
