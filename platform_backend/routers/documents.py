@@ -137,10 +137,10 @@ async def _upload_document_impl(file, embedding_namespace, user, _debug_log, bac
         # #endregion
         with get_cursor() as cur:
             cur.execute(
-                """INSERT INTO documents (tenant_id, file_path, embedding_namespace)
-                   VALUES (%s, %s, %s) 
-                   RETURNING id, tenant_id, file_path, embedding_namespace""",
-                (tenant_id, file_path, namespace),
+                """INSERT INTO documents (tenant_id, file_path, embedding_namespace, file_name, file_size_mb, file_type, status)
+                   VALUES (%s, %s, %s, %s, %s, %s, 'pending') 
+                   RETURNING id, tenant_id, file_path, embedding_namespace, file_name, file_type""",
+                (tenant_id, file_path, namespace, file.filename, file_size_mb, ext[1:]),
             )
             row = cur.fetchone()
             doc_id = str(row["id"])
@@ -225,10 +225,10 @@ async def upload_from_url(
     
     with get_cursor() as cur:
         cur.execute(
-            """INSERT INTO documents (tenant_id, file_path, embedding_namespace)
-               VALUES (%s, %s, %s) 
-               RETURNING id, tenant_id, file_path, embedding_namespace""",
-            (tenant_id, file_path, namespace),
+            """INSERT INTO documents (tenant_id, file_path, embedding_namespace, file_name, file_size_mb, file_type, status)
+               VALUES (%s, %s, %s, %s, %s, %s, 'pending') 
+               RETURNING id, tenant_id, file_path, embedding_namespace, file_name, file_type""",
+            (tenant_id, file_path, namespace, request.url.split("/")[-1] or "webpage", file_size_mb, ext[1:]),
         )
         row = cur.fetchone()
         doc_id = str(row["id"])

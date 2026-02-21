@@ -31,6 +31,23 @@ def _check_agent_limit(tenant_id: str) -> bool:
 router = APIRouter(prefix="/agents", tags=["agents"])
 
 
+def _ensure_agents_table_columns():
+    """Garante que a tabela agents tenha as colunas team_id e settings."""
+    with get_cursor() as cur:
+        cur.execute("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'agents' AND column_name = 'team_id') THEN
+                    ALTER TABLE agents ADD COLUMN team_id UUID;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'agents' AND column_name = 'settings') THEN
+                    ALTER TABLE agents ADD COLUMN settings JSONB DEFAULT '{}'::jsonb;
+                END IF;
+            END
+            $$;
+        """)
+
+
 class AgentCreate(BaseModel):
     name: str
     niche: str | None = None
@@ -129,6 +146,7 @@ def _row_to_agent(r: dict) -> AgentResponse:
 
 @router.get("", response_model=list[AgentResponse])
 def list_agents(user: dict = Depends(get_current_user)):
+    _ensure_agents_table_columns()
     tenant_id = _ensure_tenant(user)
     with get_cursor() as cur:
         cur.execute(
@@ -141,6 +159,7 @@ def list_agents(user: dict = Depends(get_current_user)):
 
 @router.post("", response_model=AgentResponse, dependencies=[Depends(require_role(["company_admin", "platform_admin"]))])
 def create_agent(body: AgentCreate, user: dict = Depends(get_current_user)):
+    _ensure_agents_table_columns()
     tenant_id = _ensure_tenant(user)
     if not _check_agent_limit(tenant_id):
         raise HTTPException(
@@ -158,6 +177,7 @@ def create_agent(body: AgentCreate, user: dict = Depends(get_current_user)):
             )
             row = cur.fetchone()
     except Exception as e:
+        # Fallback caso embedding_namespace ainda não exista por algum motivo (schema antigo)
         if "embedding_namespace" in str(e) and "does not exist" in str(e).lower():
             with get_cursor() as cur:
                 cur.execute(

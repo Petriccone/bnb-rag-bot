@@ -87,7 +87,7 @@ export default function IntegrationsPage() {
         <div className="max-w-6xl mx-auto">
             <div className="flex justify-between items-center mb-8">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Integrações</h1>
+                    <h1 className="text-2xl font-bold text-red-600 dark:text-white">Integrações (Updated)</h1>
                     <p className="text-sm text-gray-500 dark:text-gray-400">Conecte seus agentes aos canais de comunicação.</p>
                 </div>
             </div>
