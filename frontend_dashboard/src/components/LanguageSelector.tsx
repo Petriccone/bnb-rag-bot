@@ -24,20 +24,21 @@ export default function LanguageSelector() {
         <div className="relative" ref={ref}>
             <button
                 onClick={() => setOpen(!open)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition"
+                className="flex items-center gap-1 p-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[#1f2937] rounded-lg transition"
                 aria-label="Change language"
             >
                 <Globe className="h-4 w-4" />
-                <span>{localeFlags[locale]}</span>
+                <span className="hidden sm:inline text-xs">{localeFlags[locale]}</span>
+                <span className="sm:hidden text-xs">{localeFlags[locale]}</span>
             </button>
 
             {open && (
-                <div className="absolute right-0 mt-1 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-50 overflow-hidden">
+                <div className="absolute right-0 mt-1 w-36 bg-white dark:bg-[#1f2937] border border-gray-200 dark:border-[#374151] rounded-lg shadow-lg z-[9999] overflow-hidden">
                     {locales.map((loc) => (
                         <button
                             key={loc}
                             onClick={() => { setLocale(loc); setOpen(false); }}
-                            className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-gray-50 transition ${locale === loc ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'
+                            className={`w-full flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-[#374151] transition ${locale === loc ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 font-medium' : 'text-gray-700 dark:text-gray-300'
                                 }`}
                         >
                             <span>{localeFlags[loc]}</span>

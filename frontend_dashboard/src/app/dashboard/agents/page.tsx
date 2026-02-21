@@ -86,19 +86,19 @@ export default function AgentsPage() {
                                                 {agent.status}
                                             </span>
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
                                             <button
                                                 onClick={() => setChatTarget({ id: agent.id, name: agent.name, niche: agent.niche })}
-                                                className="inline-flex items-center mr-3 px-3 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 text-xs font-semibold transition-all duration-200 border border-blue-200 dark:border-blue-800/50"
+                                                className="inline-flex items-center mr-2 px-2 sm:px-3 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 text-xs font-semibold transition-all duration-200 border border-blue-200 dark:border-blue-800/50"
                                             >
-                                                <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
-                                                Testar
+                                                <MessageSquare className="h-3.5 w-3.5 sm:mr-1.5" />
+                                                <span className="hidden sm:inline">Testar</span>
                                             </button>
-                                            <Link href={`/dashboard/agents/${agent.id}`} className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 inline-flex items-center mr-3 transition-colors duration-200">
-                                                <Settings className="h-4 w-4 mr-1" />{t.edit}
+                                            <Link href={`/dashboard/agents/${agent.id}`} className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 inline-flex items-center mr-2 transition-colors duration-200">
+                                                <Settings className="h-4 w-4" /><span className="hidden sm:inline ml-1">{t.edit}</span>
                                             </Link>
                                             <button onClick={() => handleDelete(agent.id)} className="text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 inline-flex items-center transition-colors duration-200">
-                                                <Trash2 className="h-4 w-4 mr-1" />{t.delete}
+                                                <Trash2 className="h-4 w-4" /><span className="hidden sm:inline ml-1">{t.delete}</span>
                                             </button>
                                         </td>
                                     </tr>
