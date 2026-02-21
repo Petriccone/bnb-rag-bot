@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { apiClient } from '@/lib/api';
 import { useI18n } from '@/lib/i18n-context';
-import { Save, Sparkles, Loader2, UploadCloud, FileText, CheckCircle } from 'lucide-react';
+import { Save, Sparkles, Loader2, UploadCloud, FileText, CheckCircle, GitBranch, ArrowRight } from 'lucide-react';
 
 export default function AgentEditPage() {
     const router = useRouter();
@@ -35,16 +35,28 @@ export default function AgentEditPage() {
     const [aiTone, setAiTone] = useState('');
     const [aiGoal, setAiGoal] = useState('');
 
+    // Agent-to-agent delegation
+    const [allAgents, setAllAgents] = useState<{ id: string; name: string; niche: string }[]>([]);
+    const [canDelegateTo, setCanDelegateTo] = useState<string[]>([]);
+
     useEffect(() => {
         const fetchAgent = async () => {
             if (!id) return;
             try {
                 const tenant_id = localStorage.getItem('tenant_id');
+                // Fetch this agent
                 const res = await apiClient.get(`/agents/${id}`, { headers: { 'x-tenant-id': tenant_id } });
                 setName(res.data.name || '');
                 setNiche(res.data.niche || '');
                 setPrompt(res.data.prompt_custom || '');
                 setNamespace(res.data.embedding_namespace || '');
+                // Load can_delegate_to from settings
+                const delegateTo = res.data.settings?.can_delegate_to;
+                if (Array.isArray(delegateTo)) setCanDelegateTo(delegateTo);
+
+                // Fetch all agents for delegation UI
+                const allRes = await apiClient.get('/agents/', { headers: { 'x-tenant-id': tenant_id } });
+                setAllAgents((allRes.data || []).filter((a: any) => a.id !== id));
             } catch (err: any) {
                 setError((t as any).agentNotFound || "Agente não encontrado");
             } finally {
@@ -53,6 +65,12 @@ export default function AgentEditPage() {
         };
         fetchAgent();
     }, [id, t]);
+
+    const toggleDelegate = (agentId: string) => {
+        setCanDelegateTo(prev =>
+            prev.includes(agentId) ? prev.filter(x => x !== agentId) : [...prev, agentId]
+        );
+    };
 
     const handleGenerateAiPrompt = async () => {
         setGenLoading(true);
@@ -122,7 +140,12 @@ export default function AgentEditPage() {
         setError('');
         try {
             const tenant_id = localStorage.getItem('tenant_id');
-            await apiClient.patch(`/agents/${id}`, { name, niche, prompt_custom: prompt }, { headers: { 'x-tenant-id': tenant_id } });
+            await apiClient.patch(`/agents/${id}`, {
+                name,
+                niche,
+                prompt_custom: prompt,
+                settings: { can_delegate_to: canDelegateTo },
+            }, { headers: { 'x-tenant-id': tenant_id } });
             router.push('/dashboard/agents');
         } catch (err: any) {
             setError(err.response?.data?.detail || "Falha ao atualizar agente");
@@ -271,6 +294,69 @@ export default function AgentEditPage() {
                                 className="max-w-lg shadow-sm block w-full focus:ring-2 focus:ring-blue-600 focus:border-blue-600 sm:text-sm border border-gray-300 dark:border-[#374151] bg-white dark:bg-[#0b0e14] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 rounded-lg py-2 px-3 transition-colors duration-200"
                                 placeholder={t.customPromptPlaceholder} />
                             <p className="mt-2 text-sm text-gray-500 dark:text-gray-400 transition-colors duration-200">{t.customPromptHelp}</p>
+                        </div>
+                    </div>
+
+                    {/* Agent-to-Agent Delegation Section */}
+                    <div className="sm:grid sm:grid-cols-3 sm:gap-4 sm:items-start sm:border-t sm:border-gray-200 dark:sm:border-[#1f2937] sm:pt-5 transition-colors duration-200">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 transition-colors duration-200 flex items-center gap-1.5">
+                                <GitBranch className="h-4 w-4 text-indigo-500" />
+                                Pode Chamar
+                            </label>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Agentes que este agente pode acionar automaticamente.</p>
+                        </div>
+                        <div className="mt-1 sm:mt-0 sm:col-span-2 space-y-3">
+                            {allAgents.length === 0 ? (
+                                <p className="text-sm text-gray-400 dark:text-gray-500 italic">Nenhum outro agente disponível no tenant.</p>
+                            ) : (
+                                <>
+                                    <div className="space-y-2">
+                                        {allAgents.map(agent => (
+                                            <label
+                                                key={agent.id}
+                                                className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all duration-150 ${canDelegateTo.includes(agent.id)
+                                                    ? 'border-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 dark:border-indigo-600'
+                                                    : 'border-gray-200 dark:border-[#374151] hover:border-gray-300 dark:hover:border-gray-500'
+                                                    }`}
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={canDelegateTo.includes(agent.id)}
+                                                    onChange={() => toggleDelegate(agent.id)}
+                                                    className="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
+                                                />
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{agent.name}</p>
+                                                    {agent.niche && <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{agent.niche}</p>}
+                                                </div>
+                                                {canDelegateTo.includes(agent.id) && (
+                                                    <span className="flex-shrink-0 text-xs font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-100 dark:bg-indigo-900/40 px-2 py-0.5 rounded-full">Ativo</span>
+                                                )}
+                                            </label>
+                                        ))}
+                                    </div>
+
+                                    {/* Visual pipeline */}
+                                    {canDelegateTo.length > 0 && (
+                                        <div className="mt-3 p-3 bg-gray-50 dark:bg-[#0b0e14] rounded-lg border border-gray-200 dark:border-[#1f2937]">
+                                            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-2">Pipeline de delegação</p>
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <span className="px-2.5 py-1 rounded-full bg-blue-600 text-white text-xs font-bold shadow">{name || 'Este agente'}</span>
+                                                {allAgents.filter(a => canDelegateTo.includes(a.id)).map(a => (
+                                                    <React.Fragment key={a.id}>
+                                                        <ArrowRight className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+                                                        <span className="px-2.5 py-1 rounded-full bg-indigo-600 text-white text-xs font-bold shadow">{a.name}</span>
+                                                    </React.Fragment>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                            <p className="text-xs text-gray-400 dark:text-gray-500">
+                                O supervisor de IA decide automaticamente quando acionar o agente correto com base na intenção do usuário.
+                            </p>
                         </div>
                     </div>
 

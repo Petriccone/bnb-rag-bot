@@ -15,8 +15,10 @@ SUPERVISOR_MODELS = [
     "google/gemini-flash-1.5"
 ]
 
-def _get_tenant_agents(tenant_id: str) -> list[dict]:
-    """Retorna a lista de agentes ativos disponíveis no tenant."""
+def _get_tenant_agents(tenant_id: str, allowed_ids: list[str] | None = None) -> list[dict]:
+    """Retorna a lista de agentes ativos disponíveis no tenant.
+    Se allowed_ids for fornecido, filtra apenas esses agentes (para can_delegate_to).
+    """
     if not _use_postgres():
         return []
     
@@ -25,17 +27,20 @@ def _get_tenant_agents(tenant_id: str) -> list[dict]:
     try:
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT id, name, niche, prompt_custom FROM agents WHERE tenant_id = %s AND status = 'active'",
+                "SELECT id, name, niche, prompt_custom, settings FROM agents WHERE tenant_id = %s AND active = true",
                 (tenant_id,)
             )
             rows = cur.fetchall()
             for r in rows:
+                agent_id = str(r["id"])
+                # Filter by allowed_ids if provided
+                if allowed_ids is not None and agent_id not in allowed_ids:
+                    continue
                 desc = f"Name: {r['name']} - Niche: {r['niche']}"
                 if r['prompt_custom']:
-                    # Take only a snippet of custom prompt to save tokens
-                    desc += f" - Behavior: {r['prompt_custom'][:100]}..." 
+                    desc += f" - Behavior: {r['prompt_custom'][:100]}..."
                 agents.append({
-                    "id": str(r["id"]),
+                    "id": agent_id,
                     "name": r["name"],
                     "description": desc
                 })
@@ -46,16 +51,55 @@ def _get_tenant_agents(tenant_id: str) -> list[dict]:
     finally:
         conn.close()
 
+
+def _get_agent_settings(tenant_id: str, agent_id: str) -> dict:
+    """Busca settings do agente atual para ler can_delegate_to."""
+    if not _use_postgres():
+        return {}
+    conn = _get_pg_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT settings FROM agents WHERE id = %s AND tenant_id = %s",
+                (agent_id, tenant_id)
+            )
+            row = cur.fetchone()
+            if row and row["settings"]:
+                settings = row["settings"]
+                if isinstance(settings, str):
+                    settings = json.loads(settings)
+                return settings if isinstance(settings, dict) else {}
+        return {}
+    except Exception as e:
+        print(f"Error fetching agent settings: {e}")
+        return {}
+    finally:
+        conn.close()
+
+
 def route_conversation(tenant_id: str, user_message: str, recent_log: list[dict], current_agent_id: str | None = None) -> dict:
     """
     Roteador do AIOS: Analisa a conversa e retorna o id do agente que deve responder.
+    Respeita can_delegate_to nos settings do agente atual.
     Retorna {"target_agent_id": UUID, "reason": str}
     """
-    agents = _get_tenant_agents(tenant_id)
-    
-    # Se só houver 1 agente ou nenhum, não há o que rotear
-    if len(agents) <= 1:
-         return {"target_agent_id": current_agent_id or (agents[0]["id"] if agents else None), "reason": "Only one or zero agents available"}
+    # Se há um agente atual, verifica se ele tem can_delegate_to configurado
+    allowed_ids: list[str] | None = None
+    if current_agent_id and tenant_id:
+        settings = _get_agent_settings(tenant_id, current_agent_id)
+        can_delegate_to = settings.get("can_delegate_to")
+        if isinstance(can_delegate_to, list) and len(can_delegate_to) > 0:
+            allowed_ids = [str(aid) for aid in can_delegate_to]
+        else:
+            # Sem configuração de delegação → não roteia
+            return {"target_agent_id": current_agent_id, "reason": "No delegation configured for this agent"}
+
+    agents = _get_tenant_agents(tenant_id, allowed_ids=allowed_ids)
+
+    # Se só houver 1 agente ou nenhum (além do atual), não há o que rotear
+    callable_agents = [a for a in agents if a["id"] != current_agent_id]
+    if not callable_agents:
+        return {"target_agent_id": current_agent_id or (agents[0]["id"] if agents else None), "reason": "No callable agents available"}
 
     api_key = os.environ.get("OPENROUTER_API_KEY", "").strip()
     if not api_key:

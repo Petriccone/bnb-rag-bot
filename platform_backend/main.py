@@ -63,7 +63,11 @@ class VercelPathFixMiddleware(BaseHTTPMiddleware):
         if fixed:
             request.scope["path"] = fixed
         elif path and not path.startswith("/api") and path not in ("/", "/health"):
-            if any(path.startswith(x) for x in ("/auth", "/webhook", "/tenants", "/agents", "/documents", "/metrics", "/docs")):
+            if any(path.startswith(x) for x in (
+                "/auth", "/webhook", "/tenants", "/agents", 
+                "/documents", "/metrics", "/docs", 
+                "/whatsapp", "/telegram", "/billing", "/widget"
+            )):
                 request.scope["path"] = "/api" + path
         return await call_next(request)
 
