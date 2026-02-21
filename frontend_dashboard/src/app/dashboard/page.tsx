@@ -66,21 +66,55 @@ export default function DashboardHome() {
                 ))}
             </div>
 
-            {(!usage || usage?.plan === 'free') && (
-                <div className="mt-8 bg-gradient-to-r from-[#8b5cf6] to-[#6d28d9] rounded-xl shadow-lg transform transition-all hover:scale-[1.01]">
-                    <div className="px-6 py-8 sm:p-10 lg:flex lg:items-center lg:justify-between">
-                        <div>
-                            <h3 className="text-2xl font-extrabold text-white sm:text-3xl">{t.upgradeTitle}</h3>
-                            <p className="mt-4 text-lg text-purple-100 max-w-2xl">{t.upgradeDescription}</p>
+            {(() => {
+                const plan = usage?.plan?.toLowerCase();
+                const isTopTier = plan === 'business' || plan === 'enterprise';
+                const showUpgrade = !plan || plan === 'free' || plan === 'starter' || plan === 'growth';
+
+                if (isTopTier) {
+                    return (
+                        <div className="mt-8 bg-gradient-to-r from-[#1e1b4b] to-[#312e81] dark:from-[#111827] dark:to-[#1a1040] rounded-xl shadow-lg border border-[#4c1d95] dark:border-[#3b0764] overflow-hidden">
+                            <div className="px-6 py-8 sm:p-10 lg:flex lg:items-center lg:justify-between">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 bg-gradient-to-br from-yellow-400 to-amber-500 rounded-full flex items-center justify-center shadow-lg flex-shrink-0">
+                                        <span className="text-2xl">👑</span>
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-extrabold text-white">Membro {plan === 'enterprise' ? 'Enterprise' : 'Business'}</h3>
+                                        <p className="mt-1 text-sm text-purple-200">Você tem acesso completo a todos os recursos da plataforma. Obrigado pela confiança!</p>
+                                    </div>
+                                </div>
+                                <div className="mt-6 lg:mt-0 lg:flex-shrink-0">
+                                    <a href="/dashboard/training" className="inline-flex items-center justify-center px-5 py-3 border border-purple-400 text-sm font-semibold rounded-lg text-white hover:bg-purple-800/30 transition-all duration-200">
+                                        📚 Gerenciar Base de Conhecimento
+                                    </a>
+                                </div>
+                            </div>
                         </div>
-                        <div className="mt-8 lg:mt-0 lg:flex-shrink-0">
-                            <a href="/dashboard/billing" className="inline-flex items-center justify-center px-5 py-3 border border-transparent text-base font-medium rounded-md text-[#6d28d9] bg-white hover:bg-gray-50 transition">
-                                {t.upgradeCta}
-                            </a>
+                    );
+                }
+
+                if (showUpgrade) {
+                    return (
+                        <div className="mt-8 bg-gradient-to-r from-[#8b5cf6] to-[#6d28d9] rounded-xl shadow-lg transform transition-all hover:scale-[1.01]">
+                            <div className="px-6 py-8 sm:p-10 lg:flex lg:items-center lg:justify-between">
+                                <div>
+                                    <h3 className="text-2xl font-extrabold text-white sm:text-3xl">{t.upgradeTitle}</h3>
+                                    <p className="mt-4 text-lg text-purple-100 max-w-2xl">{t.upgradeDescription}</p>
+                                </div>
+                                <div className="mt-8 lg:mt-0 lg:flex-shrink-0">
+                                    <a href="/dashboard/billing" className="inline-flex items-center justify-center px-5 py-3 border border-transparent text-base font-medium rounded-md text-[#6d28d9] bg-white hover:bg-gray-50 transition">
+                                        {t.upgradeCta}
+                                    </a>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                </div>
-            )}
+                    );
+                }
+
+                return null;
+            })()}
+
 
             <div className="mt-8 bg-white dark:bg-[#111827] border border-gray-200 dark:border-[#1f2937] shadow-xl rounded-xl p-8 transition-colors duration-200">
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6 transition-colors duration-200">{t.quickActions}</h2>

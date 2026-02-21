@@ -4,7 +4,8 @@ import React, { useEffect, useState } from 'react';
 import { apiClient } from '@/lib/api';
 import { useI18n } from '@/lib/i18n-context';
 import Link from 'next/link';
-import { Plus, Trash2, Settings } from 'lucide-react';
+import { Plus, Trash2, Settings, MessageSquare } from 'lucide-react';
+import AgentChatModal from '@/components/AgentChatModal';
 
 interface Agent {
     id: string;
@@ -13,10 +14,17 @@ interface Agent {
     status: string;
 }
 
+interface ChatTarget {
+    id: string;
+    name: string;
+    niche: string;
+}
+
 export default function AgentsPage() {
     const { t } = useI18n();
     const [agents, setAgents] = useState<Agent[]>([]);
     const [loading, setLoading] = useState(true);
+    const [chatTarget, setChatTarget] = useState<ChatTarget | null>(null);
 
     const fetchAgents = async () => {
         try {
@@ -78,6 +86,13 @@ export default function AgentsPage() {
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <button
+                                            onClick={() => setChatTarget({ id: agent.id, name: agent.name, niche: agent.niche })}
+                                            className="inline-flex items-center mr-3 px-3 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 text-xs font-semibold transition-all duration-200 border border-blue-200 dark:border-blue-800/50"
+                                        >
+                                            <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
+                                            Testar
+                                        </button>
                                         <Link href={`/dashboard/agents/${agent.id}`} className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 inline-flex items-center mr-3 transition-colors duration-200">
                                             <Settings className="h-4 w-4 mr-1" />{t.edit}
                                         </Link>
@@ -91,6 +106,16 @@ export default function AgentsPage() {
                     </table>
                 )}
             </div>
+
+            {/* Chat Test Modal */}
+            {chatTarget && (
+                <AgentChatModal
+                    agentId={chatTarget.id}
+                    agentName={chatTarget.name}
+                    agentNiche={chatTarget.niche}
+                    onClose={() => setChatTarget(null)}
+                />
+            )}
         </div>
     );
 }
