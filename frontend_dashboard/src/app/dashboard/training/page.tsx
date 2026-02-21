@@ -100,12 +100,22 @@ export default function TrainingPage() {
 
     // Prefer file_name field; fallback to deriving from file_path (supports both / and \ separators)
     const getDisplayName = (doc: Document) => {
-        if (doc.file_name && doc.file_name.trim()) return doc.file_name;
+        if (doc.file_name && doc.file_name.trim() && doc.file_name !== 'unknown') return doc.file_name;
         const raw = doc.file_path || '';
         const parts = raw.replace(/\\/g, '/').split('/');
         const name = parts[parts.length - 1] || 'Documento';
-        // If name looks like a UUID (no extension or only hex chars), return generic label
-        if (/^[0-9a-f-]{32,}$/i.test(name.replace(/\.[^.]+$/, ''))) return 'Documento sem nome';
+
+        // Se for um nome genérico em hash gerado pelo sistema
+        if (/^[0-9a-f-]{32,}$/i.test(name.replace(/\.[^.]+$/, ''))) {
+            // Documentos nativos da B&B que vêm como 'Spin Selling' etc
+            if (raw.toLowerCase().includes('spin')) return 'Spin Selling Training';
+
+            // Tenta identificar se é global
+            if (doc.embedding_namespace?.startsWith('tenant_')) {
+                return 'Treinamento de Vendas (Base Global)';
+            }
+            return 'Documento de Treinamento';
+        }
         return name;
     };
 
@@ -181,7 +191,7 @@ export default function TrainingPage() {
                         >
                             <option value="">🌍 Base Global (todos os agentes)</option>
                             {agents.map(agent => (
-                                <option key={agent.id} value={agent.id}>🤖 Apenas: {agent.name}</option>
+                                <option key={agent.id} value={agent.id}>🤖 {agent.name}</option>
                             ))}
                         </select>
                     </div>
