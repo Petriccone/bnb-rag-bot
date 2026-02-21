@@ -62,7 +62,7 @@ export default function IntegrationsPage() {
             setTgLoading(true);
             const formData = new FormData();
             formData.append('token_file', new Blob([tgToken], { type: 'text/plain' }), 'token.txt');
-            const response = await apiClient.post('/telegram/connect-with-file', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+            const response = await apiClient.post('/telegram/connect-with-file', formData);
             if (response.status === 200 || response.status === 201) { alert('Telegram conectado com sucesso!'); setTgToken(''); fetchStatuses(); }
             else alert('Erro ao conectar Telegram.');
         } catch { alert('Erro ao conectar Telegram.'); } finally { setTgLoading(false); }

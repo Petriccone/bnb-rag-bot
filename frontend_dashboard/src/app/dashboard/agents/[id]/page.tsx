@@ -115,19 +115,17 @@ export default function AgentEditPage() {
 
             const uploadUrl = `/documents/upload?embedding_namespace=${encodeURIComponent(currentNamespace)}`;
 
-            const response = await apiClient.post(uploadUrl, formData, {
-                headers: { 'Content-Type': 'multipart/form-data' }
-            });
+            const response = await apiClient.post(uploadUrl, formData);
 
             if (response.status === 200 || response.status === 201) {
                 setUploadSuccess(true);
                 setTimeout(() => setUploadSuccess(false), 5000);
             } else {
-                alert("Erro ao enviar o documento.");
+                alert("Erro ao enviar o documento: " + (response.data?.detail || "Erro desconhecido"));
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error uploading document:', error);
-            alert("Erro ao enviar o documento.");
+            alert("Erro ao enviar o documento: " + (error.response?.data?.detail || error.message || "Erro de conexão"));
         } finally {
             setUploading(false);
             if (fileInputRef.current) fileInputRef.current.value = '';

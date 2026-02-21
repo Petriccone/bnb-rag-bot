@@ -193,6 +193,7 @@ def create_agent(body: AgentCreate, user: dict = Depends(get_current_user)):
 
 @router.get("/{agent_id}", response_model=AgentResponse)
 def get_agent(agent_id: UUID, user: dict = Depends(get_current_user)):
+    _ensure_agents_table_columns()
     tenant_id = _ensure_tenant(user)
     with get_cursor() as cur:
         cur.execute(
@@ -207,6 +208,7 @@ def get_agent(agent_id: UUID, user: dict = Depends(get_current_user)):
 
 @router.patch("/{agent_id}", response_model=AgentResponse, dependencies=[Depends(require_role(["company_admin", "platform_admin"]))])
 def update_agent(agent_id: UUID, body: AgentUpdate, user: dict = Depends(get_current_user)):
+    _ensure_agents_table_columns()
     tenant_id = _ensure_tenant(user)
     with get_cursor() as cur:
         cur.execute(
@@ -251,6 +253,7 @@ def update_agent(agent_id: UUID, body: AgentUpdate, user: dict = Depends(get_cur
 
 @router.delete("/{agent_id}", dependencies=[Depends(require_role(["company_admin", "platform_admin"]))])
 def delete_agent(agent_id: UUID, user: dict = Depends(get_current_user)):
+    _ensure_agents_table_columns()
     tenant_id = _ensure_tenant(user)
     with get_cursor() as cur:
         cur.execute("DELETE FROM agents WHERE id = %s AND tenant_id = %s", (str(agent_id), tenant_id))
@@ -262,6 +265,7 @@ def delete_agent(agent_id: UUID, user: dict = Depends(get_current_user)):
 @router.post("/{agent_id}/pause")
 def pause_agent(agent_id: UUID, user: dict = Depends(get_current_user)):
     """Pausa um agente (define active = false)."""
+    _ensure_agents_table_columns()
     tenant_id = _ensure_tenant(user)
     with get_cursor() as cur:
         cur.execute(
@@ -277,6 +281,7 @@ def pause_agent(agent_id: UUID, user: dict = Depends(get_current_user)):
 @router.post("/{agent_id}/resume")
 def resume_agent(agent_id: UUID, user: dict = Depends(get_current_user)):
     """Ativa um agente pausado (define active = true)."""
+    _ensure_agents_table_columns()
     tenant_id = _ensure_tenant(user)
     with get_cursor() as cur:
         cur.execute(
@@ -292,6 +297,7 @@ def resume_agent(agent_id: UUID, user: dict = Depends(get_current_user)):
 @router.post("/{agent_id}/chat")
 def agent_chat(agent_id: UUID, body: ChatRequest, user: dict = Depends(get_current_user)):
     """Envia uma mensagem ao agente e retorna a resposta (chat de teste no dashboard)."""
+    _ensure_agents_table_columns()
     tenant_id = _ensure_tenant(user)
     msg = (body.message or "").strip()
     if not msg:
