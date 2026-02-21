@@ -85,8 +85,8 @@ export default function BillingPage() {
     return (
         <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
             <div className="text-center">
-                <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white transition-colors duration-200">{t.billingTitle || 'Planos'}</h1>
-                <p className="mt-4 text-xl text-gray-600 dark:text-gray-400 transition-colors duration-200">{t.billingSubtitle || 'Start building for free, upgrade when you need more power and volume.'}</p>
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white transition-colors duration-200">{t.billingTitle || 'Planos'}</h1>
+                <p className="mt-3 text-base sm:text-xl text-gray-600 dark:text-gray-400 transition-colors duration-200">{t.billingSubtitle || 'Comece grátis, depois escale a sua equipe de IA conforme o seu crescimento.'}</p>
             </div>
 
             {currentPlan !== 'free' && currentPlan !== 'starter' && (

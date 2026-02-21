@@ -66,44 +66,46 @@ export default function AgentsPage() {
                 ) : agents.length === 0 ? (
                     <div className="text-center py-12"><p className="text-sm text-gray-500 dark:text-gray-400">{t.noAgentsFound}</p></div>
                 ) : (
-                    <table className="min-w-full divide-y divide-gray-200 dark:divide-[#1f2937] transition-colors duration-200">
-                        <thead className="bg-gray-50 dark:bg-[#0b0e14] transition-colors duration-200">
-                            <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t.agentName}</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t.specialty}</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t.status}</th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t.actions}</th>
-                            </tr>
-                        </thead>
-                        <tbody className="bg-white dark:bg-[#111827] divide-y divide-gray-200 dark:divide-[#1f2937] transition-colors duration-200">
-                            {agents.map((agent) => (
-                                <tr key={agent.id} className="hover:bg-gray-50 dark:hover:bg-[#1f2937] transition-colors duration-200">
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100 transition-colors duration-200">{agent.name}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 transition-colors duration-200">{agent.niche || t.generalist}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <span className={`inline-flex px-2 text-xs leading-5 font-semibold rounded-full border border-transparent dark:border-opacity-50 transition-colors duration-200 ${agent.status === 'active' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 dark:border-green-800/50' : 'bg-gray-100 dark:bg-[#1f2937] text-gray-800 dark:text-gray-400 dark:border-[#374151]'}`}>
-                                            {agent.status}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <button
-                                            onClick={() => setChatTarget({ id: agent.id, name: agent.name, niche: agent.niche })}
-                                            className="inline-flex items-center mr-3 px-3 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 text-xs font-semibold transition-all duration-200 border border-blue-200 dark:border-blue-800/50"
-                                        >
-                                            <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
-                                            Testar
-                                        </button>
-                                        <Link href={`/dashboard/agents/${agent.id}`} className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 inline-flex items-center mr-3 transition-colors duration-200">
-                                            <Settings className="h-4 w-4 mr-1" />{t.edit}
-                                        </Link>
-                                        <button onClick={() => handleDelete(agent.id)} className="text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 inline-flex items-center transition-colors duration-200">
-                                            <Trash2 className="h-4 w-4 mr-1" />{t.delete}
-                                        </button>
-                                    </td>
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200 dark:divide-[#1f2937] transition-colors duration-200">
+                            <thead className="bg-gray-50 dark:bg-[#0b0e14] transition-colors duration-200">
+                                <tr>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t.agentName}</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t.specialty}</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t.status}</th>
+                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t.actions}</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody className="bg-white dark:bg-[#111827] divide-y divide-gray-200 dark:divide-[#1f2937] transition-colors duration-200">
+                                {agents.map((agent) => (
+                                    <tr key={agent.id} className="hover:bg-gray-50 dark:hover:bg-[#1f2937] transition-colors duration-200">
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100 transition-colors duration-200">{agent.name}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 transition-colors duration-200">{agent.niche || t.generalist}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <span className={`inline-flex px-2 text-xs leading-5 font-semibold rounded-full border border-transparent dark:border-opacity-50 transition-colors duration-200 ${agent.status === 'active' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 dark:border-green-800/50' : 'bg-gray-100 dark:bg-[#1f2937] text-gray-800 dark:text-gray-400 dark:border-[#374151]'}`}>
+                                                {agent.status}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                            <button
+                                                onClick={() => setChatTarget({ id: agent.id, name: agent.name, niche: agent.niche })}
+                                                className="inline-flex items-center mr-3 px-3 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 text-xs font-semibold transition-all duration-200 border border-blue-200 dark:border-blue-800/50"
+                                            >
+                                                <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
+                                                Testar
+                                            </button>
+                                            <Link href={`/dashboard/agents/${agent.id}`} className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 inline-flex items-center mr-3 transition-colors duration-200">
+                                                <Settings className="h-4 w-4 mr-1" />{t.edit}
+                                            </Link>
+                                            <button onClick={() => handleDelete(agent.id)} className="text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 inline-flex items-center transition-colors duration-200">
+                                                <Trash2 className="h-4 w-4 mr-1" />{t.delete}
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 )}
             </div>
 

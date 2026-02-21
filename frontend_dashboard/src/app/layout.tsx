@@ -18,6 +18,12 @@ export const metadata: Metadata = {
   description: "Crie, gerencie e escale agentes de IA personalizados para o seu negócio com a Botfy.",
 };
 
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{

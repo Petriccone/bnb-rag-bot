@@ -14,7 +14,9 @@ import {
     LogOut,
     Bot,
     BookOpen,
-    Smartphone
+    Smartphone,
+    Menu,
+    X
 } from 'lucide-react';
 
 export default function DashboardLayout({
@@ -26,6 +28,7 @@ export default function DashboardLayout({
     const pathname = usePathname();
     const { t } = useI18n();
     const [isMounted, setIsMounted] = useState(false);
+    const [sidebarOpen, setSidebarOpen] = useState(false);
 
     useEffect(() => {
         setIsMounted(true);
@@ -34,6 +37,11 @@ export default function DashboardLayout({
             router.push('/login');
         }
     }, [pathname, router]);
+
+    // Close sidebar when navigating
+    useEffect(() => {
+        setSidebarOpen(false);
+    }, [pathname]);
 
     if (!isMounted) return null;
 
@@ -53,58 +61,110 @@ export default function DashboardLayout({
         { name: 'Configurações', href: '/dashboard/settings', icon: Settings },
     ];
 
-    return (
-        <div className="flex h-screen bg-gray-50 dark:bg-[#0b0e14] transition-colors duration-200">
-            {/* Sidebar */}
-            <div className="w-64 bg-white dark:bg-[#111827] border-r border-gray-200 dark:border-[#1f2937] flex flex-col transition-colors duration-200">
-                <div className="h-16 flex items-center px-6 border-b border-gray-200 dark:border-[#1f2937]">
-                    <span className="text-xl font-extrabold tracking-tight">
-                        <span className="text-gray-900 dark:text-gray-100">Bot</span><span className="text-[#8b5cf6]">fy</span>
-                    </span>
-                </div>
-
-                <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
-                    {navItems.map((item) => {
-                        const isActive = pathname === item.href;
-                        return (
-                            <Link
-                                key={item.name}
-                                href={item.href}
-                                className={`flex items-center px-3 py-2 text-sm font-medium rounded-lg group transition ${isActive
-                                    ? 'bg-blue-50 dark:bg-[#1f2937] text-blue-700 dark:text-white'
-                                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#1f2937] hover:text-gray-900 dark:hover:text-white'
-                                    }`}
-                            >
-                                <item.icon
-                                    className={`mr-3 flex-shrink-0 h-5 w-5 ${isActive ? 'text-[#8b5cf6]' : 'text-gray-500 group-hover:text-gray-300'
-                                        }`}
-                                    aria-hidden="true"
-                                />
-                                {item.name}
-                            </Link>
-                        );
-                    })}
-                </nav>
-
-                <div className="p-4 border-t border-gray-200 dark:border-[#1f2937] transition-colors duration-200">
-                    <button
-                        onClick={handleLogout}
-                        className="flex w-full items-center px-3 py-2 text-sm font-medium text-red-600 dark:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 transition"
-                    >
-                        <LogOut className="mr-3 flex-shrink-0 h-5 w-5 text-red-500" />
-                        {t.signOut}
-                    </button>
-                </div>
+    const SidebarContent = () => (
+        <>
+            {/* Logo */}
+            <div className="h-16 flex items-center px-6 border-b border-gray-200 dark:border-[#1f2937] flex-shrink-0">
+                <span className="text-xl font-extrabold tracking-tight">
+                    <span className="text-gray-900 dark:text-gray-100">Bot</span><span className="text-[#8b5cf6]">fy</span>
+                </span>
             </div>
 
-            {/* Main Content */}
-            <div className="flex-1 flex flex-col overflow-hidden">
-                {/* Top bar with language selector */}
-                <header className="h-14 bg-white dark:bg-[#111827] border-b border-gray-200 dark:border-[#1f2937] flex items-center justify-end px-6 transition-colors duration-200">
-                    <ThemeToggle />
-                    <LanguageSelector />
+            {/* Nav */}
+            <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
+                {navItems.map((item) => {
+                    const isActive = pathname === item.href;
+                    return (
+                        <Link
+                            key={item.name}
+                            href={item.href}
+                            className={`flex items-center px-3 py-2.5 text-sm font-medium rounded-lg group transition ${isActive
+                                ? 'bg-blue-50 dark:bg-[#1f2937] text-blue-700 dark:text-white'
+                                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#1f2937] hover:text-gray-900 dark:hover:text-white'
+                                }`}
+                        >
+                            <item.icon
+                                className={`mr-3 flex-shrink-0 h-5 w-5 ${isActive ? 'text-[#8b5cf6]' : 'text-gray-500 group-hover:text-gray-300'}`}
+                                aria-hidden="true"
+                            />
+                            {item.name}
+                        </Link>
+                    );
+                })}
+            </nav>
+
+            {/* Logout */}
+            <div className="p-4 border-t border-gray-200 dark:border-[#1f2937] transition-colors duration-200">
+                <button
+                    onClick={handleLogout}
+                    className="flex w-full items-center px-3 py-2 text-sm font-medium text-red-600 dark:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 transition"
+                >
+                    <LogOut className="mr-3 flex-shrink-0 h-5 w-5 text-red-500" />
+                    {t.signOut}
+                </button>
+            </div>
+        </>
+    );
+
+    return (
+        <div className="flex h-screen bg-gray-50 dark:bg-[#0b0e14] transition-colors duration-200 overflow-hidden">
+
+            {/* ── Desktop Sidebar ── */}
+            <div className="hidden lg:flex lg:flex-col lg:w-64 bg-white dark:bg-[#111827] border-r border-gray-200 dark:border-[#1f2937] transition-colors duration-200 flex-shrink-0">
+                <SidebarContent />
+            </div>
+
+            {/* ── Mobile Sidebar Overlay ── */}
+            {sidebarOpen && (
+                <div
+                    className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
+                    onClick={() => setSidebarOpen(false)}
+                />
+            )}
+
+            {/* ── Mobile Sidebar Drawer ── */}
+            <div className={`fixed inset-y-0 left-0 z-50 w-72 flex flex-col bg-white dark:bg-[#111827] border-r border-gray-200 dark:border-[#1f2937] transform transition-transform duration-300 ease-in-out lg:hidden ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+                {/* Close button inside drawer */}
+                <button
+                    className="absolute top-4 right-4 p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-[#1f2937] transition"
+                    onClick={() => setSidebarOpen(false)}
+                >
+                    <X className="h-5 w-5" />
+                </button>
+                <SidebarContent />
+            </div>
+
+            {/* ── Main Content ── */}
+            <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+
+                {/* Top bar */}
+                <header className="h-14 bg-white dark:bg-[#111827] border-b border-gray-200 dark:border-[#1f2937] flex items-center justify-between px-4 lg:px-6 flex-shrink-0 transition-colors duration-200">
+                    {/* Hamburger — mobile only */}
+                    <button
+                        className="lg:hidden p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#1f2937] transition"
+                        onClick={() => setSidebarOpen(true)}
+                        aria-label="Abrir menu"
+                    >
+                        <Menu className="h-5 w-5" />
+                    </button>
+
+                    {/* Mobile Logo */}
+                    <span className="lg:hidden text-lg font-extrabold tracking-tight">
+                        <span className="text-gray-900 dark:text-gray-100">Bot</span><span className="text-[#8b5cf6]">fy</span>
+                    </span>
+
+                    {/* Desktop spacer */}
+                    <div className="hidden lg:block" />
+
+                    {/* Controls */}
+                    <div className="flex items-center gap-2">
+                        <ThemeToggle />
+                        <LanguageSelector />
+                    </div>
                 </header>
-                <main className="flex-1 overflow-y-auto p-8 bg-gray-50 dark:bg-[#0b0e14] text-gray-900 dark:text-gray-100 transition-colors duration-200">
+
+                {/* Page content */}
+                <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-gray-50 dark:bg-[#0b0e14] text-gray-900 dark:text-gray-100 transition-colors duration-200">
                     {children}
                 </main>
             </div>
