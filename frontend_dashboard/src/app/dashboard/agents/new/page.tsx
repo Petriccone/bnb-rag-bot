@@ -47,10 +47,16 @@ export default function AgentCreatePage() {
         setError('');
         try {
             const tenant_id = localStorage.getItem('tenant_id');
-            await apiClient.post('/agents/', { name, niche, prompt_custom: prompt, status: 'active' }, { headers: { 'x-tenant-id': tenant_id } });
-            router.push('/dashboard/agents');
+            const response = await apiClient.post('/agents/', { name, niche, prompt_custom: prompt, status: 'active' }, { headers: { 'x-tenant-id': tenant_id } });
+
+            // Redirect to the edit page of the newly created agent to allow for immediate file upload
+            if (response.data && response.data.id) {
+                router.push(`/dashboard/agents/${response.data.id}`);
+            } else {
+                router.push('/dashboard/agents');
+            }
         } catch (err: any) {
-            setError(err.response?.data?.detail || "Falha ao criar agente");
+            setError(err.response?.data?.detail || err.message || "Falha ao criar agente");
         } finally { setLoading(false); }
     };
 
