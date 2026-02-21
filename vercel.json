@@ -1,13 +1,3 @@
 {
-  "version": 2,
-  "framework": "nextjs",
-  "buildCommand": "cd frontend_dashboard && npm install && npm run build",
-  "outputDirectory": "frontend_dashboard/.next",
-  "installCommand": "cd frontend_dashboard && npm install",
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "/"
-    }
-  ]
+  "version": 2
 }
