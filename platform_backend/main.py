@@ -41,6 +41,7 @@ whatsapp = _safe_import("whatsapp")
 telegram = _safe_import("telegram")
 telegram_webhook = _safe_import("telegram_webhook")
 billing = _safe_import("billing")
+widget = _safe_import("widget")
 
 
 def _normalize_api_path(raw: str) -> str:
@@ -115,6 +116,8 @@ if telegram_webhook:
     app.include_router(telegram_webhook, prefix="/api/webhook/telegram")
 if billing:
     app.include_router(billing, prefix="/api")
+if widget:
+    app.include_router(widget, prefix="/api")
 
 
 @app.get("/")
