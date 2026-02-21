@@ -89,12 +89,19 @@ app = FastAPI(title="B&B RAG Platform API", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "https://botfyai.vercel.app",
+        "https://botfy-dashboard.vercel.app",
+    ],
     allow_origin_regex=r"https://.*\.vercel\.app|http://localhost:.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"],
 )
+# VercelPathFixMiddleware deve vir DEPOIS do CORS para não interferir nos headers
 app.add_middleware(VercelPathFixMiddleware)
 
 if auth:
