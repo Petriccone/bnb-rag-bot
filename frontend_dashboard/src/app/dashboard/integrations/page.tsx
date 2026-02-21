@@ -38,9 +38,9 @@ export default function IntegrationsPage() {
             } catch { /* offline */ }
             try {
                 const tgRes = await apiClient.get('/telegram/status');
-                if (tgRes.status === 200) setTgStatus({ connected: tgRes.data.connected, message: tgRes.data.message || 'Desconectado' });
-                else setTgStatus({ connected: false, message: 'Desconectado' });
-            } catch { setTgStatus({ connected: false, message: 'Desconectado' }); }
+                if (tgRes.status === 200) setTgStatus({ connected: tgRes.data.connected, message: tgRes.data.error || (tgRes.data.connected ? 'Conectado.' : 'Desconectado. Nenhum bot configurado ou token inválido.') });
+                else setTgStatus({ connected: false, message: 'Erro ao buscar status do Telegram' });
+            } catch (err: any) { setTgStatus({ connected: false, message: 'Offline: ' + err.message }); }
             try {
                 const agRes = await apiClient.get('/agents/');
                 setAgents(agRes.data || []);

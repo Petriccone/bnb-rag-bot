@@ -20,6 +20,7 @@ class TelegramBotInfo(BaseModel):
     bot_username: str | None = None
     connected: bool = False
     agent_id: str | None = None
+    error: str | None = None
 
 
 class TelegramAgentUpdate(BaseModel):
@@ -169,8 +170,8 @@ def telegram_status(user: dict = Depends(get_current_user)):
             connected=True,
             agent_id=cfg.get("agent_id"),
         )
-    except Exception:
-        return TelegramBotInfo(connected=False)
+    except Exception as e:
+        return TelegramBotInfo(connected=False, error=str(e))
 
 
 @router.get("/bot-info", response_model=TelegramBotInfo)
